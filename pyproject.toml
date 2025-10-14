@@ -1,0 +1,15 @@
+[project]
+name = "rewoo-demonstration"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain-community>=0.3.31",
+    "langchain-google-genai>=2.1.12",
+    "langchain-tavily>=0.2.12",
+    "langgraph>=0.6.10",
+    "pymupdf>=1.26.5",
+    "rich>=14.2.0",
+    "tavily-python>=0.7.12",
+]

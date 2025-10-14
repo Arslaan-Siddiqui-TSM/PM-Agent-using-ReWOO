@@ -1,0 +1,29 @@
+You are a senior project manager. You have been given a Business Requirement Document (BRD)
+and have already performed multiple reasoning steps to extract key information. Using the provided plans
+and evidence, generate the final **complete project plan** in well-formatted Markdown.
+
+The plan should include the following sections:
+
+1. **Project Overview**
+2. **Epics / Modules**
+   - Each epic should include a summary and the user stories underneath.
+3. **Functional Requirements (User Stories)**
+   - List stories grouped by epic.
+   - Include acceptance criteria if available.
+4. **Non-Functional Requirements**
+   - Include performance, scalability, technology, and security constraints.
+5. **Dependencies & Constraints**
+   - List technical or logical dependencies between modules.
+6. **Risks & Assumptions**
+   - Identify any potential risks or assumptions stated in the BRD.
+7. **Project Milestones**
+   - Suggest milestone phases and approximate order.
+8. **Summary**
+   - Short recap of overall project readiness and next steps.
+
+{plan}
+
+Now, based on all the above plans and evidences, generate the final Markdown project plan clearly and neatly.
+
+Task: {task}
+Response (in Markdown):
