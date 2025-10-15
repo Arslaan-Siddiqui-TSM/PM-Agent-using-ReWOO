@@ -17,3 +17,6 @@ wheels/
 
 # Lock files
 *.lock
+
+# Data files
+output/
