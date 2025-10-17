@@ -324,12 +324,16 @@ model = ChatGoogleGenerativeAI(
 
 ### Basic Usage
 
-1. **Place your BRD** in the `files/` directory (e.g., `files/brd_1.pdf`)
+1. **Place your BRD** in the `files/` directory (e.g., `files/brd_1.pdf`, `files/brd_2.pdf`)
 
-2. **Update the task** in `main.py`:
+2. **Edit `main.py`** to specify the document path:
 
    ```python
-   task = "Create a complete project plan in Markdown format based on the BRD document located at 'files/brd_1.pdf'."
+   if __name__ == "__main__":
+       run_agent(
+           document_path="files/brd_1.pdf",  # Change this to your BRD
+           task="Create implementation plan for the client project."
+       )
    ```
 
 3. **Run the application**:
@@ -341,6 +345,39 @@ model = ChatGoogleGenerativeAI(
 4. **View the output**:
    - Console: Real-time progress with rich formatting
    - File: `outputs/project_plan_YYYYMMDD_HHMMSS.md`
+
+### Testing Different BRDs
+
+To test different documents, simply change the `document_path` parameter:
+
+```python
+# Test with different BRD
+run_agent(document_path="files/brd_2.pdf")
+
+# Test with custom task
+run_agent(
+    document_path="files/ecommerce_brd.pdf",
+    task="Create a detailed technical architecture plan"
+)
+```
+
+### Running Feasibility Agent
+
+Edit `app/feasibility_agent.py` to specify documents:
+
+```python
+if __name__ == "__main__":
+    sample_files = [
+        "files/brd_1.pdf",  # Add your BRD paths here
+    ]
+    questions_file = run_feasibility_agent(sample_files)
+```
+
+Then run:
+
+```bash
+python app/feasibility_agent.py
+```
 
 ### Console Output
 
@@ -592,7 +629,6 @@ Overall assessment and next steps
 
 ---
 
-
 ## 🤝 Contributing
 
 Contributions are welcome! Here's how you can help:
@@ -602,7 +638,6 @@ Contributions are welcome! Here's how you can help:
 3. **Commit your changes**: `git commit -m 'Add amazing feature'`
 4. **Push to the branch**: `git push origin feature/amazing-feature`
 5. **Open a Pull Request**
-
 
 ## 🙏 Acknowledgments
 

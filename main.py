@@ -7,19 +7,32 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich import box
+import time
 
-task = "Create a complete project plan in Markdown format based on the BRD document located at 'files/brd_1.pdf'."
 
-
-if __name__ == "__main__":
-    app = get_graph(ReWOO(task=task, plan_string=None, result=None))
+def run_agent(document_path: str, task: str = "Create implementation plan for the client project."):
+    """
+    Run the ReWOO agent with a specified document path.
+    
+    Args:
+        document_path (str): Path to the BRD document (e.g., 'files/brd_1.pdf')
+        task (str): Task description for the agent
+    """
+    # Construct the full task with document path
+    full_task = f"{task} Use the BRD document located at '{document_path}'."
+    
+    start_time = time.time()
+    app = get_graph(ReWOO(task=full_task, plan_string=None, result=None))
     # === Improved Output Formatting ===
     console = Console()
     final_state = None
 
     console.rule("[bold blue]🔍 Executing ReWOO Reasoning Graph[/bold blue]")
+    console.print(f"[bold cyan]📄 Document:[/bold cyan] {document_path}")
+    console.print(f"[bold cyan]📋 Task:[/bold cyan] {task}")
+    console.print("\n")
 
-    for s in app.stream(ReWOO(task=task, plan_string=None, result=None)):
+    for s in app.stream(ReWOO(task=full_task, plan_string=None, result=None)):
         # Each s is a dict like {'plan': {...}} or {'tool': {...}} etc.
         node_name = next(iter(s))
         data = s[node_name]
@@ -59,5 +72,18 @@ if __name__ == "__main__":
 
     console.rule("[bold blue]✅ Finished Execution[/bold blue]")
     if final_state and "solve" in final_state:
-        console.print(Panel(Text(final_state["solve"]["result"], justify="center", style="bold white on chartreuse3"),
+        console.print(Panel(Text(final_state["solve"]["result"], justify="center", style="bold white on blue1"),
                             title="Final Result", border_style="blue", expand=False))
+    
+    elapsed_time = time.time() - start_time
+    console.print(f"\n[bold green]⏱️ Total execution time: {elapsed_time:.2f} seconds[/bold green]")
+
+
+if __name__ == "__main__":
+    # Example usage - simply change the document_path parameter to test different BRDs
+    # NOTE: If you change the document_path, ensure corresponding feasibility answers are available (first run generate_feasibility_questions.py)
+    # and the path of the feasibility answers file in app/plan.py is updated accordingly.
+    run_agent(
+        document_path="files/cms_brd.pdf",
+        task="Create implementation plan for the client project."
+    )

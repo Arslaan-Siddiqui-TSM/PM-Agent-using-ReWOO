@@ -1,29 +1,44 @@
-You are a senior project manager. You have been given a Business Requirement Document (BRD)
-and have already performed multiple reasoning steps to extract key information. Using the provided plans
-and evidence, generate the final **complete project plan** in well-formatted Markdown.
+You are a senior project manager responsible for generating a comprehensive project plan.
 
-The plan should include the following sections:
+You have been provided with:
+- Client-provided requirement documents (like BRDs or specifications)
+- Extracted reasoning steps and evidences from earlier stages
+- **Feasibility analysis notes** from the Tech Lead, which describe technical viability, constraints, and implementation recommendations
+
+Use all of this context carefully to create the **final, complete project plan** in well-formatted Markdown.
+
+---
+
+### Feasibility Context
+{feasibility_context}
+
+---
+
+### Your Task
+Using the following plans and evidence, generate a final Markdown project plan with all the required sections below:
 
 1. **Project Overview**
 2. **Epics / Modules**
-   - Each epic should include a summary and the user stories underneath.
+   - Each epic should include a summary and user stories underneath.
 3. **Functional Requirements (User Stories)**
-   - List stories grouped by epic.
-   - Include acceptance criteria if available.
+   - Group stories under their respective epics.
+   - Include acceptance criteria where applicable.
 4. **Non-Functional Requirements**
-   - Include performance, scalability, technology, and security constraints.
+   - Capture performance, scalability, security, and technology constraints.
 5. **Dependencies & Constraints**
-   - List technical or logical dependencies between modules.
+   - Outline technical or logical dependencies between modules.
 6. **Risks & Assumptions**
-   - Identify any potential risks or assumptions stated in the BRD.
+   - Identify project risks, assumptions, and areas needing further validation.
 7. **Project Milestones**
-   - Suggest milestone phases and approximate order.
+   - Suggest milestone phases, order of execution, and dependencies.
 8. **Summary**
-   - Short recap of overall project readiness and next steps.
+   - Provide a short recap of overall project feasibility, readiness, and next steps.
+
+---
 
 {plan}
 
-Now, based on all the above plans and evidences, generate the final Markdown project plan clearly and neatly.
+Now, based on the above feasibility context, plans, and evidences, generate the **final Markdown project plan** neatly and clearly.
 
 Task: {task}
 Response (in Markdown):

@@ -1,8 +1,7 @@
-import os
-import re
+import os, re
 from states.rewoo_state import ReWOO
-from langchain_core.prompts import ChatPromptTemplate
 from config.llm_config import model
+from utils.helper import load_feasibility_answers
 
 
 def get_plan(state: ReWOO) -> dict:
@@ -14,24 +13,26 @@ def get_plan(state: ReWOO) -> dict:
     Returns:
         dict: A dictionary containing the generated plan steps and other relevant information.
     """
-    # Read the prompt from the file directly to avoid circular imports
-    prompt_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "prompts", "planner_prompt.txt"))
+
+    # Load the base prompt template
+    prompt_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "prompts", "planner_prompt.txt")
+    )
     with open(prompt_path, "r", encoding="utf-8") as f:
-        prompt = f.read()
+        prompt_template = f.read()
+
+    # Load task and feasibility notes
     task = state.task
+    feasibility_context = load_feasibility_answers("outputs/cms_brd_feasibility_questions.md") or "No feasibility answers available yet."
 
-    result = model.invoke(prompt.format(task=task))
+    # Fill the placeholders
+    formatted_prompt = prompt_template.format(task=task, feasibility_context=feasibility_context)
 
-    # Regex to match expressions of the form E#... = ...[...]
+    # Call LLM to generate the planning steps
+    result = model.invoke(formatted_prompt)
+
+    # Extract the plan structure
     regex_pattern = r"Plan:\s*(.+)\s*(#E\d+)\s*=\s*(\w+)\s*\[([^\]]+)\]"
-    prompt_template = ChatPromptTemplate.from_messages([("human", prompt)])
-    planner = prompt_template | model
+    matches = re.findall(regex_pattern, str(result.content or ""))
 
-    current_task = state.task
-    result = planner.invoke({"task": current_task})
-    # Find all matches in the sample text
-    if result.content is None:
-        matches = []
-    else:
-        matches = re.findall(regex_pattern, str(result.content))
-    return {"steps": matches, "plan_string": str(result.content)}
+    return {"steps": matches, "plan_string": str(result.content or "")}

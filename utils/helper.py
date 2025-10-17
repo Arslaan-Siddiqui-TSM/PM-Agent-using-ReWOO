@@ -1,3 +1,4 @@
+import os
 from states.rewoo_state import ReWOO
 
 
@@ -80,3 +81,16 @@ def truncate_query(query: str, max_length: int = 400) -> str:
 
     # If no good separators found, just truncate with ellipsis
     return query[:max_length-3] + "..."
+
+
+def load_feasibility_answers(file_path="outputs/feasibility_questions.md"):
+    """Reads feasibility answers (if provided by Tech Lead) from markdown file."""
+    if not os.path.exists(file_path):
+        print(f"⚠️ Feasibility answers file not found at {file_path}")
+        return None
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+
+    return content
+
