@@ -1,11 +1,4 @@
-You are a senior project manager responsible for producing a comprehensive, client-ready project plan.
-
-You have access to:
-- Multiple client-provided requirement documents (such as BRDs, SRSs, FSDs, etc.)
-- Extracted reasoning steps and evidences from earlier analysis
-- **Feasibility notes** reviewed by the Tech Lead, covering technical risks, constraints, and stack considerations
-
-Your job is to combine all this context into a single, polished **final project plan** in Markdown format.
+You are a senior project manager producing a comprehensive, client-ready project plan.
 
 ---
 
@@ -15,29 +8,94 @@ Your job is to combine all this context into a single, polished **final project 
 ---
 
 ### Your Task
-Using the following plans and evidences, generate a complete project plan that includes all these sections:
+Using the plans and evidences below, generate a project plan following this exact structure:
 
-1. **Project Overview**
-2. **Epics / Modules**
-   - Include a summary and corresponding user stories.
-3. **Functional Requirements (User Stories)**
-   - Group stories by epic and include acceptance criteria.
-4. **Non-Functional Requirements**
-   - Highlight scalability, performance, technology, and security aspects.
-5. **Dependencies & Constraints**
-   - List any logical or technical dependencies.
-6. **Risks & Assumptions**
-   - Identify risks, assumptions, or unknowns.
-7. **Project Milestones**
-   - Suggest milestone phases and order of implementation.
-8. **Summary**
-   - Provide a concise recap of feasibility, readiness, and next steps.
+## Project: [Project Name]
+
+### Project Players
+- **Driver**: [Person/Role responsible for execution]
+- **Approver**: [Person/Role with final approval]
+- **Contributors**: [Teams and roles involved]
+- **Informed**: [Stakeholders needing updates]
+
+### Project Details
+- **Objective**: [Clear, measurable objective with target date]
+- **Due date**: [Final delivery date]
+- **Key outcomes**:
+  - [Measurable outcome 1]
+  - [Measurable outcome 2]
+  - [Measurable outcome 3]
+- **Status**: [Current status]
+
+### Problem Statement
+[2-3 sentences: problem being solved, why it matters, expected impact]
+
+### Scope
+
+**Must have:**
+- [Critical feature 1]
+- [Critical feature 2]
+- [Critical feature 3]
+
+**Nice to have:**
+- [Optional enhancement 1]
+- [Optional enhancement 2]
+
+**Not in scope:**
+- [Excluded item 1]
+- [Excluded item 2]
+
+### Timeline
+
+**Phase 1: [Month Range]**
+- [Activity 1]
+- [Activity 2]
+
+**Phase 2: [Month Range]**
+- [Activity 1]
+- [Activity 2]
+
+**Phase 3: [Month Range]**
+- [Activity 1]
+- [Activity 2]
+
+**Phase 4: [Month Range]**
+- [Activity 1]
+- [Activity 2]
+
+### Milestones and Deadlines
+- [Milestone name] - @[Owner] - [Date]
+- [Milestone name] - @[Owner] - [Date]
+- [Milestone name] - @[Owner] - [Date]
+
+### Budget Considerations
+- [Resource allocation]
+- [Infrastructure costs]
+- [Licensing/tooling costs]
+
+### Communication Plan
+- **Frequency**: [How often]
+- **Format**: [Status reports, standups, etc.]
+- **Audience**: [Who receives updates]
+- **Channels**: [Tools and platforms]
+
+### Risks & Assumptions
+**Risks:**
+- [Risk 1 and mitigation]
+- [Risk 2 and mitigation]
+
+**Assumptions:**
+- [Assumption 1]
+- [Assumption 2]
+
+### Summary
+[Concise recap: feasibility, readiness, critical success factors, next steps]
 
 ---
 
 {plan}
 
-Now, using all the above context and reasoning, generate the **final Markdown project plan** clearly and professionally.
+Generate the final Markdown project plan now.
 
 **Task:** {task}  
-**Response (in Markdown):**
+**Response (in Markdown, without backticks):**

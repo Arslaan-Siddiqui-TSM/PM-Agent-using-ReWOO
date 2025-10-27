@@ -1,5 +1,5 @@
 from states.rewoo_state import ReWOO
-from utils.helper import get_current_task, truncate_query
+from utils.helper import get_current_task, truncate_query, get_global_logger
 from tools.search_tool import search
 from config.llm_config import model
 import fitz
@@ -15,6 +15,8 @@ def tool_execution(state: ReWOO):
     for k, v in _results.items():
         tool_input = tool_input.replace(k, v)
 
+    logger = get_global_logger()
+
     if tool == "Google":
         # Validate and truncate query length
         original_query = tool_input
@@ -26,9 +28,35 @@ def tool_execution(state: ReWOO):
             tool_input = truncated_query
 
         result = search.invoke(tool_input)
+        
+        # Log Google search
+        if logger:
+            logger.log_llm_interaction(
+                stage=f"Tool Execution - Google Search",
+                prompt=f"Search Query: {tool_input}",
+                response=str(result),
+                additional_context={
+                    "Evidence ID": step_name,
+                    "Tool": "Google",
+                    "Query Length": f"{len(tool_input)} characters"
+                }
+            )
     
     elif tool == "LLM":
         result = model.invoke(tool_input)
+        
+        # Log LLM interaction
+        if logger:
+            logger.log_llm_interaction(
+                stage=f"Tool Execution - LLM",
+                prompt=tool_input,
+                response=str(result.content),
+                additional_context={
+                    "Evidence ID": step_name,
+                    "Tool": "LLM",
+                    "Step": f"{_step}"
+                }
+            )
     
     elif tool == "FileReader":
         file_path = tool_input.strip().strip("'").strip('"')
@@ -41,6 +69,21 @@ def tool_execution(state: ReWOO):
             result = text.strip()
         except Exception as e:
             result = f"Error reading file: {str(e)}"
+        
+        # Log FileReader interaction
+        if logger:
+            result_preview = result[:1000] + "... [truncated]" if len(result) > 1000 else result
+            logger.log_llm_interaction(
+                stage=f"Tool Execution - FileReader",
+                prompt=f"File Path: {file_path}",
+                response=result_preview,
+                additional_context={
+                    "Evidence ID": step_name,
+                    "Tool": "FileReader",
+                    "File": file_path,
+                    "Content Length": f"{len(result)} characters"
+                }
+            )
     else:
         raise ValueError(f"Unknown tool: {tool}")
 

@@ -370,7 +370,7 @@ if __name__ == "__main__":
     sample_files = [
         "files/brd_1.pdf",  # Add your BRD paths here
     ]
-    questions_file = run_feasibility_agent(sample_files)
+    assessment_file = run_feasibility_agent(sample_files)
 ```
 
 Then run:
@@ -650,7 +650,7 @@ Contributions are welcome! Here's how you can help:
 
 ## 📧 Support
 
-For questions, issues, or feature requests:
+For assessment, issues, or feature requests:
 
 - Open an issue on GitHub
 - Contact the maintainers

@@ -2,7 +2,7 @@ from states.rewoo_state import ReWOO
 from config.llm_config import model
 import os
 import time
-from utils.helper import load_feasibility_answers
+from utils.helper import load_feasibility_answers, get_global_logger
 
 
 def solve(state: ReWOO):
@@ -35,7 +35,7 @@ def solve(state: ReWOO):
         solve_prompt = f.read()
 
     # Load feasibility context (if available)
-    feasibility_context = load_feasibility_answers() or "No feasibility notes available yet."
+    feasibility_context = load_feasibility_answers("outputs/feasibility_questions.md") or "No feasibility notes available yet."
 
     # Fill the prompt with dynamic data
     formatted_prompt = solve_prompt.format(
@@ -47,12 +47,26 @@ def solve(state: ReWOO):
     # Generate the final project plan via LLM
     result = model.invoke(formatted_prompt)
 
+    # Log the complete solver LLM interaction
+    logger = get_global_logger()
+    if logger:
+        logger.log_llm_interaction(
+            stage="Solver - Final Solution Generation",
+            prompt=formatted_prompt,
+            response=str(result.content),
+            additional_context={
+                "Task": state.task,
+                "Number of Steps": len(state.steps) if state.steps else 0,
+                "Plan Length": f"{len(plan)} characters",
+                "Feasibility Context Length": f"{len(feasibility_context)} characters"
+            }
+        )
+
     # Save the result to a Markdown file with timestamp
     output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "outputs"))
     os.makedirs(output_dir, exist_ok=True)
 
-    task_str = str(getattr(state, "task", "untitled") or "untitled")
-    file_name = f"project_plan_{task_str.replace(' ', '_')[:30]}_{time.strftime('%Y%m%d_%H%M%S')}.md"
+    file_name = f"project_plan_{time.strftime('%Y%m%d_%H%M%S')}.md"
     file_path = os.path.join(output_dir, file_name)
 
     with open(file_path, "w", encoding="utf-8") as f:

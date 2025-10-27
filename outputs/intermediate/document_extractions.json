@@ -1,0 +1,1347 @@
+[
+  {
+    "filename": "Functional Specification Document.pdf",
+    "document_type": "functional_specification",
+    "title": "Functional Specification Document: Online Apparels Shopping Website",
+    "summary": "This document details the functional specifications for the development of an Online Apparels Shopping Website, an e-commerce platform. It outlines the features for both the frontend website for buyers and the web-based backend/admin panel for the business owner.",
+    "requirements": [
+      {
+        "id": "FR-001",
+        "description": "Login: Users shall be able to log in using their registered email and password. A 'Reset Password' option shall be available. Users must also be able to log in using Facebook and Google accounts.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-002",
+        "description": "Registration: Buyers must register using a simple form (First name, Last name, Email ID, Contact number, Password, Conform password). They must accept terms and conditions. Email ID verification is mandatory before the user can log in.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-010",
+        "description": "My Account: Logged-in buyers can access and manage their Profile details (email, phone number), change password, view/manage Addresses, My Orders, My Wishlist, Shopping Cart, and Ratings and reviews.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-003",
+        "description": "Product Search: Buyers/Guests can search for products by keyword, browsing category/sub-category, and using filters and sorting options. Searching is available without login.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-004",
+        "description": "Product Listing: The product listing page shall display the Product title, Thumbnail image, Price, and Ratings & reviews.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-005",
+        "description": "Product Details: The product details page shall display Product title, Thumbnail image, Product images, Product description, Price, available Sizes/colors (variations), and Ratings & reviews. Users can check shipping availability by entering a PIN code.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-006",
+        "description": "Wishlist: Buyers can view, add, or delete products from their wishlist. Products in the wishlist can be moved to the shopping cart for checkout. Adding to wishlist is not possible without login.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-007",
+        "description": "Shopping Cart: Users can add/remove items and update the quantity of items. The cart shall display the item price, sub-total, and total price.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-008",
+        "description": "Checkout & Payment: Before payment, the buyer must enter billing and shipping addresses. Payment methods must include Credit card/debit card and Net banking. The order summary shall display Item total, Sub-total, Shipping cost, Tax, and Order total. Stripe payment gateway will be integrated for online payment.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-012",
+        "description": "Order History & Tracking: Buyers can view a list of all past orders and detailed information. Users can track the status of their current orders and reorder items from past order details. Order status updates will trigger email notifications.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-011",
+        "description": "Ratings & Reviews: Users can only post ratings and reviews for products they have previously ordered from the website.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-009",
+        "description": "Social Media Sharing: Buyers/Guests can share products on social media. Login is not mandatory.",
+        "priority": "low",
+        "type": "functional"
+      },
+      {
+        "id": "FR-013",
+        "description": "Contact Support: Buyers/Guests can contact support via email for queries/complaints by submitting their name, email, contact number, and message. Admin will receive an email with the complaint details.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-014",
+        "description": "Admin Login: Admin/Sub-users can log in using a username and password. A 'Reset Password' option shall be available.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-015",
+        "description": "Dashboard: The Admin Dashboard shall display key metrics: Total no. of active and inactive registered buyers, Total no. of Products uploaded, and Total Revenue (today/this month).",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-019",
+        "description": "Products Management: Admin can Add/Edit/Active/Inactive products in the catalog. Information managed includes Product name, Images, Description, Keywords, and Variations (color, size).",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-018",
+        "description": "Product Categories Management: Admin can Add/Edit/Active/Inactive product categories and sub-categories.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-017",
+        "description": "Orders Management: Admin can view a list of all orders with their current status, view/edit order details, and update the order status. Possible statuses are: Open, Confirmed, In process, Shipped, and Delivered.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-017",
+        "description": "Shipping Management: Admin is responsible for order shipment and shall maintain shipment details: Shipping carrier, Tracking ID, Current status of shipment, Delivery location/address, and Shipping cost.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-016",
+        "description": "Buyers Management: Admin can view/edit/activate/inactivate buyer account information, including profile details, address, orders, wishlist, and items in cart.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-020",
+        "description": "Ratings & Review Management: Admin can approve/reject ratings and reviews posted by the buyers for products.",
+        "priority": "medium",
+        "type": "functional"
+      },
+      {
+        "id": "FR-019",
+        "description": "Payment Management: Admin can view/edit bank account details (to receive payments) and view the payment status of each order. Stripe payment gateway will be used.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-024",
+        "description": "CMS Management: Admin can edit the content for the following CMS pages: About us, Contact us, Privacy policy, and Terms and conditions.",
+        "priority": "critical",
+        "type": "functional"
+      },
+      {
+        "id": "FR-021",
+        "description": "Statistics & Reports: Admin can view reports on Products uploaded (filterable by Date: From-To, Month, Year) and Revenue/total sale (filterable by Today, Current week, Date: From-To, Month, Year). Reports can be exported to PDF and Excel formats.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-022",
+        "description": "System Users Management: Admin can create/edit/delete/activate/inactivate sub-users for various sectional operations.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-023",
+        "description": "Roles Management: Admin can add/edit/delete/activate/inactivate sub-admin users with role-based access.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-026",
+        "description": "Complaints/Feedbacks: Admin can view queries/complaints/feedbacks received from buyers (via FR-013). The admin will also receive an email notification for each submission.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-025",
+        "description": "Email Management: Admin can add/edit/delete content for emails to be sent to buyers regarding new product launch, offers, and promotions.",
+        "priority": "medium",
+        "type": "functional"
+      },
+      {
+        "id": "NFR-001",
+        "description": "Scalability: The website repository shall accommodate up to 100 concurrent users.",
+        "priority": null,
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-002",
+        "description": "Speed/Performance: Web pages should load in less than 3 seconds under good internet speed.",
+        "priority": null,
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-003",
+        "description": "Reliability/Availability: Web pages must not display \"page not found\" errors for non-existent pages.",
+        "priority": null,
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-004",
+        "description": "Security: SSL security and encryption are mandatory for online payments.",
+        "priority": null,
+        "type": "non-functional"
+      }
+    ],
+    "features": [
+      {
+        "name": "Account Management (Login/Registration)",
+        "description": "Allows users to log in, register, and manage their account details.",
+        "priority": "critical"
+      },
+      {
+        "name": "Product Search",
+        "description": "Enables buyers/guests to search for products by keyword, category, and filters.",
+        "priority": "critical"
+      },
+      {
+        "name": "Product Listing",
+        "description": "Displays product information such as title, image, price, and ratings.",
+        "priority": "critical"
+      },
+      {
+        "name": "Product Details",
+        "description": "Shows detailed information about a product, including images, description, price, and variations.",
+        "priority": "critical"
+      },
+      {
+        "name": "Wishlist",
+        "description": "Allows buyers to add products to their wishlist.",
+        "priority": "high"
+      },
+      {
+        "name": "Shopping Cart",
+        "description": "Enables users to add/remove items and update quantities in their shopping cart.",
+        "priority": "critical"
+      },
+      {
+        "name": "Checkout & Payment",
+        "description": "Facilitates the checkout process, including billing/shipping address input and online payment.",
+        "priority": "critical"
+      },
+      {
+        "name": "Order History & Tracking",
+        "description": "Allows buyers to view their past orders and track the status of current orders.",
+        "priority": "critical"
+      },
+      {
+        "name": "Ratings & Reviews",
+        "description": "Enables users to post ratings and reviews for products.",
+        "priority": "high"
+      },
+      {
+        "name": "Social Media Sharing",
+        "description": "Allows buyers/guests to share products on social media.",
+        "priority": "low"
+      },
+      {
+        "name": "Contact Support",
+        "description": "Enables buyers/guests to contact support via email.",
+        "priority": "high"
+      },
+      {
+        "name": "Admin Login",
+        "description": "Allows admin/sub-users to log in to the admin panel.",
+        "priority": "critical"
+      },
+      {
+        "name": "Dashboard",
+        "description": "Displays key metrics on the admin dashboard.",
+        "priority": "critical"
+      },
+      {
+        "name": "Products Management",
+        "description": "Allows admin to manage products in the catalog.",
+        "priority": "critical"
+      },
+      {
+        "name": "Product Categories Management",
+        "description": "Allows admin to manage product categories and sub-categories.",
+        "priority": "critical"
+      },
+      {
+        "name": "Orders Management",
+        "description": "Allows admin to view and manage orders.",
+        "priority": "critical"
+      },
+      {
+        "name": "Shipping Management",
+        "description": "Allows admin to manage shipping details.",
+        "priority": "critical"
+      },
+      {
+        "name": "Buyers Management",
+        "description": "Allows admin to manage buyer accounts.",
+        "priority": "critical"
+      },
+      {
+        "name": "Ratings & Review Management",
+        "description": "Allows admin to approve/reject ratings and reviews.",
+        "priority": "medium"
+      },
+      {
+        "name": "Payment Management",
+        "description": "Allows admin to manage payment details.",
+        "priority": "critical"
+      },
+      {
+        "name": "CMS Management",
+        "description": "Allows admin to edit CMS pages.",
+        "priority": "critical"
+      },
+      {
+        "name": "Statistics & Reports",
+        "description": "Allows admin to view reports on products and revenue.",
+        "priority": "high"
+      },
+      {
+        "name": "System Users Management",
+        "description": "Allows admin to manage sub-users.",
+        "priority": "high"
+      },
+      {
+        "name": "Roles Management",
+        "description": "Allows admin to manage sub-admin roles.",
+        "priority": "high"
+      },
+      {
+        "name": "Complaints/Feedbacks",
+        "description": "Allows admin to view complaints/feedbacks from buyers.",
+        "priority": "high"
+      },
+      {
+        "name": "Email Management",
+        "description": "Allows admin to manage email content.",
+        "priority": "medium"
+      }
+    ],
+    "technical_details": {
+      "architecture": "Frontend website for buyers and a web-based backend/admin panel for the business owner.",
+      "technology_stack": [],
+      "integrations": [
+        "Stripe payment gateway"
+      ],
+      "data_model": "Product name, Images, Description, Keywords, Variations (color, size), Buyer account information, order details, shipment details."
+    },
+    "extraction_confidence": 0.95
+  },
+  {
+    "filename": "Non-Functional Requirement Document.pdf",
+    "document_type": "requirements_document",
+    "title": "Non-Functional Requirement Document: Online Apparels Shopping Website",
+    "summary": "This document specifies the non-functional requirements (NFRs) for the Online Apparels Shopping Website. These requirements define criteria used to judge the system's operation rather than specific behaviors, focusing on aspects like performance, security, scalability, and usability.",
+    "requirements": [
+      {
+        "id": "NFR-P1",
+        "description": "Page Load Speed shall not exceed 3 seconds.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-P2",
+        "description": "API Response Time shall not exceed 500 milliseconds.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-P3",
+        "description": "Search Latency shall not exceed 1 second.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-S1",
+        "description": "Must accommodate up to 100 users concurrently.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-S2",
+        "description": "Must support a minimum of 150 orders per hour.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-S3",
+        "description": "Must support a minimum of 10,000 product SKUs.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-Q1",
+        "description": "SSL security and encryption (Minimum TLS 1.2).",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-Q2",
+        "description": "Passwords must be stored using a one-way hashing algorithm (e.g., bcrypt or Argon2) with salt.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-Q3",
+        "description": "Must enforce Role-Based Access Control (RBAC) for all Admin and Sub-user functions.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-Q4",
+        "description": "System must enforce input validation against SQL Injection and Cross-Site Scripting (XSS) on all user and admin inputs.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-R1",
+        "description": "99.9% uptime during core business hours (9 AM - 5 PM EST).",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-R2",
+        "description": "Web pages should not get broken and must display an appropriate \"Page Not Found\" error.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-R3",
+        "description": "Daily full backup; retention for 30 days.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-O1",
+        "description": "Must log all create/edit/delete operations performed by Admin and Sub-users.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-O2",
+        "description": "All configurable values (e.g., Tax rates, Shipping carrier details, Email content) must be managed via the Admin Panel.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-O3",
+        "description": "Codebase must adhere to [Specific Language] coding standards (e.g., PEP8 for Python) and pass peer review.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-L1",
+        "description": "US country only. System must validate shipping addresses for US residency.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-L2",
+        "description": "All product prices will be in USD.",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-L3",
+        "description": "CMS pages for Privacy Policy and Terms and Conditions must be accessible and editable by the Admin.",
+        "priority": "high",
+        "type": "non-functional"
+      }
+    ],
+    "features": [],
+    "technical_details": {},
+    "extraction_confidence": 0.95
+  },
+  {
+    "filename": "online_apparels_shopping_website.pdf",
+    "document_type": "business_requirements",
+    "title": "Online Apparels shopping Website Business Requirements Document",
+    "summary": "This document outlines the business requirements for an online ecommerce website for selling apparels. It details the objectives, scope, user roles, and functional and non-functional requirements for both buyers and administrators.",
+    "requirements": [
+      {
+        "id": "FR-001",
+        "description": "User will be able to login into the website using the email and password. Reset password option for the users to reset the password in case of forgot password. User will also be able to login into website using Facebook and Google account.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-002",
+        "description": "Buyers will be able to get registered on website with simple registration form. Email id verification would be mandatory to get login into website.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-003",
+        "description": "Buyers will be able to search the products by keyword, by browsing through category/sub-category, using filters and sorting options. User would be able to search for the products without login into website.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-004",
+        "description": "Buyers will be able to view the listing of the product with details like product title, thumbnail image, price, ratings & reviews. User should be able to view the products listing and details without login.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-005",
+        "description": "User would be able to view all product details on this page. Login will not be required to view the product details. User will be able to check the shipping availability by entering PIN code. User will be able to add the product to his shopping cart and wishlist. User will be able to share product on social media.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-006",
+        "description": "Buyer will need to get registered and login into website to maintain his list of items in wishlist. Buyer will be able to view/ add/delete products added into his wishlist. User will be able to proceed for checkout process of items available in wishlist.",
+        "priority": "2",
+        "type": "functional"
+      },
+      {
+        "id": "FR-007",
+        "description": "The products can be added into shopping cart from the product detail page. User is required to get register and login to manage the items in his shopping cart. User will be able to add items/remove items/ update quantity of items in shopping cart. User will be able to proceed for checkout of any items/ all items available in shopping cart.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-008",
+        "description": "Payment and checkout process of the items selected from the shopping cart will be considered for placing the orders. Buyer is required to login into website for checkout and payment. Buyer will required to enter billing and shipping address before checkout and payment. Buyer will be required to select payment method for order payment. Buyers will be able to receive email notifications for the orders status update.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-009",
+        "description": "User will be able to share product on social media. Login is not mandatory to share products on social media.",
+        "priority": "4",
+        "type": "functional"
+      },
+      {
+        "id": "FR-010",
+        "description": "Buyers will be able to manage their profile details, change password, addresses from account section. Buyer will be able to access My Orders, MY wishlist, shopping cart, Ratings and reviews, Logout from My account.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-011",
+        "description": "User will be able to give ratings and review to the items which he has ordered in past/ recently. User will be able post rating and review only for the products which he has ordered from the website. Login and registration will be mandatory for the user to post ratings and review.",
+        "priority": "2",
+        "type": "functional"
+      },
+      {
+        "id": "FR-012",
+        "description": "Buyers will be able to view the orders list i.e. orders placed by the buyer on past. User will be able to view all details about the orders with total amount paid, shipping address, items quantity, price per unit etc. User will be able to reorder the items which are shown in the order details. User will be able to track his current orders from my orders section.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-013",
+        "description": "Buyers will be able to contact support team via email regarding any queries/ complaints by simply posting name, email, contact number and message to the admin. Admin will be able to receive an email regarding complaint details posted by buyer.",
+        "priority": "2",
+        "type": "functional"
+      },
+      {
+        "id": "FR-014",
+        "description": "The admin will be able to login to the admin panel. The admin will be asked to enter the user name and password in the given field. Reset password option for the admin to reset password in case of forgot password.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-015",
+        "description": "Admin user will be able to view Total no. of active and inactive registered buyers, Total no. of Products uploaded on website, Total Revenue: today/ this month on dashboard",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-016",
+        "description": "Admin user will be able to view/edit/active/inactive buyers account information from this section. Admin user will be able to view all detail of the buyer\u2019s account like profile details, address, orders, wishlist, items in cart.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-017",
+        "description": "Admin user will be able to view list of all orders placed by the buyers on website with current status of each order. Admin user will be able to view/edit order details. Admin user will be able to update the status of order placed by the buyer. Admin user will be responsible for shipment of orders placed by the buyers. Admin user will be able to maintain the shipment details into system for each order.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-018",
+        "description": "Admin user will be able add/edit/active/inactive product categories and sub-categories from this section. User will be able to add products under these categories & sub-categories from the product management section.",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-019",
+        "description": "Admin user will be able to Add/ Edit/Active/ Inactive products in catalog from this section. Admin user will also be able to manage following information of the products: Product name, Images, Description, Keywords, Variations : color, size",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-020",
+        "description": "Admin user will be able to approve/ reject ratings and reviews posted by the buyers for products.",
+        "priority": "3",
+        "type": "functional"
+      },
+      {
+        "id": "FR-021",
+        "description": "User will be able to view the following reports in system: Products uploaded, Revenue/ total sale. Admin user will be able to export reports into pdf and excel format.",
+        "priority": "2",
+        "type": "functional"
+      },
+      {
+        "id": "FR-022",
+        "description": "Admin user will be able to create/edit/delete/ active/inactive sub-users to operate the various sectional operations in system",
+        "priority": "2",
+        "type": "functional"
+      },
+      {
+        "id": "FR-023",
+        "description": "Ability to add/edit/delete/active/inactive sub-admin users with role based access",
+        "priority": "2",
+        "type": "functional"
+      },
+      {
+        "id": "FR-024",
+        "description": "Admin user will be able to edit the content for below CMS pages: About us, Contact us, Privacy policy, Terms and conditions",
+        "priority": "1",
+        "type": "functional"
+      },
+      {
+        "id": "FR-025",
+        "description": "Admin user will be able to add/edit/delete content for emails to be sent to buyers regarding new product launch, offers, and promotions.",
+        "priority": "3",
+        "type": "functional"
+      },
+      {
+        "id": "FR-026",
+        "description": "Admin user will be able to view queries/ complaints/ feedbacks received from the buyers. Admin will also receive an email regarding the feedback / complaints and queries sent by the buyers.",
+        "priority": "2",
+        "type": "functional"
+      },
+      {
+        "id": "NFR-001",
+        "description": "Scalability: The website repository shall accommodate up to 100 users concurrently.",
+        "priority": null,
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-002",
+        "description": "Speed: web pages should not take more than 30 seconds to load in good speed of internet.",
+        "priority": null,
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-003",
+        "description": "Reliability: Web pages should not get broken and display page not found error if page is not available.",
+        "priority": null,
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-004",
+        "description": "Security: SSL security and encryption for online payments",
+        "priority": null,
+        "type": "non-functional"
+      }
+    ],
+    "features": [
+      {
+        "name": "Buyer Login",
+        "description": "Allows buyers to login using email/password or social media accounts.",
+        "priority": "1"
+      },
+      {
+        "name": "Buyer Registration",
+        "description": "Allows buyers to register on the website.",
+        "priority": "1"
+      },
+      {
+        "name": "Product Search",
+        "description": "Enables buyers to search for products using keywords, categories, filters, and sorting.",
+        "priority": "1"
+      },
+      {
+        "name": "Product Listing",
+        "description": "Displays a list of products with details like title, image, price, ratings, and reviews.",
+        "priority": "1"
+      },
+      {
+        "name": "Product Details",
+        "description": "Shows detailed information about a product, including images, description, price, sizes, colors, and shipping availability.",
+        "priority": "1"
+      },
+      {
+        "name": "Wishlist",
+        "description": "Allows buyers to save products to a wishlist.",
+        "priority": "2"
+      },
+      {
+        "name": "Shopping Cart",
+        "description": "Enables buyers to add, remove, and update items in their shopping cart.",
+        "priority": "1"
+      },
+      {
+        "name": "Checkout & Payment",
+        "description": "Facilitates the checkout and payment process, including billing and shipping address entry and payment method selection.",
+        "priority": "1"
+      },
+      {
+        "name": "Social Media Sharing",
+        "description": "Allows users to share products on social media platforms.",
+        "priority": "4"
+      },
+      {
+        "name": "My Account",
+        "description": "Provides buyers with a section to manage their profile details, orders, wishlist, and reviews.",
+        "priority": "1"
+      },
+      {
+        "name": "Ratings & Reviews",
+        "description": "Allows buyers to rate and review products they have ordered.",
+        "priority": "2"
+      },
+      {
+        "name": "Order History",
+        "description": "Displays a list of past orders with details and tracking information.",
+        "priority": "1"
+      },
+      {
+        "name": "Contact Support",
+        "description": "Enables buyers to contact the support team with queries or complaints.",
+        "priority": "2"
+      },
+      {
+        "name": "Admin Login",
+        "description": "Allows the admin to login to the admin panel.",
+        "priority": "1"
+      },
+      {
+        "name": "Dashboard",
+        "description": "Displays key information like total buyers, products, and revenue.",
+        "priority": "1"
+      },
+      {
+        "name": "Buyers Management",
+        "description": "Allows the admin to manage buyer accounts.",
+        "priority": "1"
+      },
+      {
+        "name": "Orders Management",
+        "description": "Allows the admin to manage orders and update their status.",
+        "priority": "1"
+      },
+      {
+        "name": "Product Categories Management",
+        "description": "Allows the admin to manage product categories and sub-categories.",
+        "priority": "1"
+      },
+      {
+        "name": "Products Management",
+        "description": "Allows the admin to manage product information.",
+        "priority": "1"
+      },
+      {
+        "name": "Ratings & Review Management",
+        "description": "Allows the admin to approve/reject ratings and reviews.",
+        "priority": "3"
+      },
+      {
+        "name": "Statistics & Reports",
+        "description": "Provides various reports on products and revenue.",
+        "priority": "2"
+      },
+      {
+        "name": "System Users Management",
+        "description": "Allows the admin to manage sub-users.",
+        "priority": "2"
+      },
+      {
+        "name": "Roles Management",
+        "description": "Allows the admin to manage roles and permissions for sub-users.",
+        "priority": "2"
+      },
+      {
+        "name": "CMS Management",
+        "description": "Allows the admin to edit content for CMS pages like About Us and Contact Us.",
+        "priority": "1"
+      },
+      {
+        "name": "Email Management",
+        "description": "Allows the admin to manage email content for promotions and notifications.",
+        "priority": "3"
+      },
+      {
+        "name": "Complaints/Feedbacks",
+        "description": "Allows the admin to view and respond to buyer complaints and feedback.",
+        "priority": "2"
+      }
+    ],
+    "technical_details": {
+      "architecture": null,
+      "technology_stack": [],
+      "integrations": [
+        "Stripe payment gateway"
+      ],
+      "data_model": null
+    },
+    "extraction_confidence": 0.95
+  },
+  {
+    "filename": "Technical Specification Document.pdf",
+    "document_type": "technical_specification",
+    "title": "Technical Specification Document: Online Apparels Shopping Website",
+    "summary": "This document outlines the technical specifications for an online apparel shopping website. It details the system architecture, technology stack, data model, frontend and backend specifications, as well as constraints and risks.",
+    "requirements": [
+      {
+        "id": "FR-005",
+        "description": "Manage products/catalog",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-019",
+        "description": "Manage products/catalog",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-018",
+        "description": "Manage categories/sub-categories",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-002",
+        "description": "Registration",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-016",
+        "description": "Buyer Management",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-008",
+        "description": "Checkout",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-010",
+        "description": "Manage address book",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-012",
+        "description": "Order History",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-017",
+        "description": "Order Management",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-011",
+        "description": "Post/Manage Ratings & Reviews",
+        "priority": "medium",
+        "type": "functional"
+      },
+      {
+        "id": "FR-020",
+        "description": "Post/Manage Ratings & Reviews",
+        "priority": "medium",
+        "type": "functional"
+      },
+      {
+        "id": "FR-003",
+        "description": "Search Functionality",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-004",
+        "description": "Product Display",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-014",
+        "description": "Secure login form for Admin panel",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "FR-022",
+        "description": "System Security and Permissions",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "FR-023",
+        "description": "System Security and Permissions",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "FR-021",
+        "description": "Reporting and Statistics",
+        "priority": "medium",
+        "type": "functional"
+      }
+    ],
+    "features": [
+      {
+        "name": "Search Functionality",
+        "description": "Implement a server-side full-text search engine to handle keyword and category search efficiently.",
+        "priority": "high"
+      },
+      {
+        "name": "Product Variations",
+        "description": "The Product Details Page must dynamically handle color and size variations and update the display based on availability.",
+        "priority": "high"
+      },
+      {
+        "name": "Shipping Check",
+        "description": "An API call must be made to a shipping service or internal table based on the entered PIN code to check availability.",
+        "priority": "high"
+      },
+      {
+        "name": "Login/Registration",
+        "description": "Implement OAuth 2.0 or OpenID Connect flows for third-party logins. Passwords must be hashed and salted.",
+        "priority": "high"
+      },
+      {
+        "name": "Mandatory Verification",
+        "description": "Implement an asynchronous job or service to send the email verification link upon registration.",
+        "priority": "high"
+      },
+      {
+        "name": "Secure Transactions",
+        "description": "All checkout and payment pages must enforce HTTPS and interact with the Stripe API securely using tokens.",
+        "priority": "high"
+      },
+      {
+        "name": "Role-Based Access Control (RBAC)",
+        "description": "Implement a granular RBAC system allowing the main Admin to create sub-users and assign them specific roles/permissions.",
+        "priority": "high"
+      },
+      {
+        "name": "Catalog Management",
+        "description": "Utilize a Content Management System (CMS) interface within the Admin Panel to manage product attributes.",
+        "priority": "high"
+      },
+      {
+        "name": "Inventory Integration",
+        "description": "The system will use the Product Code (SKU) as the key for integrating with any future inventory management tools.",
+        "priority": "medium"
+      },
+      {
+        "name": "Order Status Workflow",
+        "description": "Implement a state machine for order status transitions with automated email notifications to the buyer upon each change.",
+        "priority": "high"
+      },
+      {
+        "name": "Data Aggregation",
+        "description": "Implement a data layer optimized for reporting to quickly generate reports for Products Uploaded and Revenue/Total Sale.",
+        "priority": "medium"
+      },
+      {
+        "name": "Export Functionality",
+        "description": "Use a library to generate and export reports into standard PDF and Excel formats.",
+        "priority": "medium"
+      }
+    ],
+    "technical_details": {
+      "architecture": "Three-Tier Architecture (Presentation, Application/Business Logic, and Data)",
+      "technology_stack": [
+        "HTML5",
+        "CSS3",
+        "JavaScript",
+        "React",
+        "Vue.js",
+        "Python",
+        "Django",
+        "Node.js",
+        "Express",
+        "PHP",
+        "Laravel",
+        "PostgreSQL",
+        "MySQL",
+        "Stripe",
+        "Elasticsearch",
+        "bcrypt",
+        "Pandas"
+      ],
+      "integrations": [
+        "Stripe Payment Gateway",
+        "Future inventory management tools",
+        "Facebook Login",
+        "Google Login"
+      ],
+      "data_model": "Entities include Product, Category, User, Address, Order, Shipment, and Rating/Review."
+    },
+    "extraction_confidence": 0.95
+  },
+  {
+    "filename": "Test Plan.pdf",
+    "document_type": "test_plan",
+    "title": "Test Plan / QA Documentation: Online Apparels Shopping Website",
+    "summary": "This Test Plan outlines the strategy, scope, resources, and schedule for testing the Online Apparels Shopping Website. The primary goal is to verify that the developed system meets all specified Functional Requirements (FRs), adheres to Non-Functional Requirements (NFRs), and satisfies the overall Business Requirements Document (BRD) objectives.",
+    "requirements": [
+      {
+        "id": "FR-001",
+        "description": "Related to Frontend functionalities like Registration, Login, Product Search/Listing.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-002",
+        "description": "Related to Frontend functionalities like Registration, Login, Product Search/Listing.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-003",
+        "description": "Related to Frontend functionalities like Registration, Login, Product Search/Listing.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-008",
+        "description": "Related to Frontend functionalities like Checkout, Online Payment.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-009",
+        "description": "Related to Frontend functionalities like Order Tracking, Ratings & Reviews.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-013",
+        "description": "Related to Frontend functionalities like My Account/Address Book.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-014",
+        "description": "Related to Backend functionalities like Admin Login.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-015",
+        "description": "Related to Backend functionalities like Dashboard.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-017",
+        "description": "Related to Backend functionalities like Orders Management.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-019",
+        "description": "Related to Backend functionalities like Products Management.",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "FR-026",
+        "description": "Related to Backend functionalities like Reporting (Statistics).",
+        "priority": "high",
+        "type": "functional"
+      },
+      {
+        "id": "NFR-001",
+        "description": "Scalability: 100 concurrent users",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-002",
+        "description": "Speed",
+        "priority": "high",
+        "type": "non-functional"
+      },
+      {
+        "id": "NFR-004",
+        "description": "SSL Security",
+        "priority": "high",
+        "type": "non-functional"
+      }
+    ],
+    "features": [
+      {
+        "name": "Registration",
+        "description": "User registration functionality.",
+        "priority": "high"
+      },
+      {
+        "name": "Login (Email/Social)",
+        "description": "User login functionality using email or social media accounts.",
+        "priority": "high"
+      },
+      {
+        "name": "Product Search/Listing",
+        "description": "Functionality to search and list products.",
+        "priority": "high"
+      },
+      {
+        "name": "Product Details/Variations",
+        "description": "Displaying product details and variations.",
+        "priority": "high"
+      },
+      {
+        "name": "Shopping Cart",
+        "description": "Functionality to add and manage items in a shopping cart.",
+        "priority": "high"
+      },
+      {
+        "name": "Wishlist",
+        "description": "Functionality to save products to a wishlist.",
+        "priority": "medium"
+      },
+      {
+        "name": "Checkout",
+        "description": "Checkout process for ordering products.",
+        "priority": "high"
+      },
+      {
+        "name": "Online Payment (Stripe)",
+        "description": "Online payment processing using Stripe.",
+        "priority": "high"
+      },
+      {
+        "name": "Order Tracking",
+        "description": "Functionality to track orders.",
+        "priority": "medium"
+      },
+      {
+        "name": "Ratings & Reviews",
+        "description": "Functionality to rate and review products.",
+        "priority": "medium"
+      },
+      {
+        "name": "My Account/Address Book",
+        "description": "User account management and address book.",
+        "priority": "medium"
+      },
+      {
+        "name": "Admin Login",
+        "description": "Admin login functionality.",
+        "priority": "high"
+      },
+      {
+        "name": "Dashboard",
+        "description": "Admin dashboard with key metrics.",
+        "priority": "high"
+      },
+      {
+        "name": "Product/Category Management",
+        "description": "Functionality to manage products and categories.",
+        "priority": "high"
+      },
+      {
+        "name": "Orders Management",
+        "description": "Functionality to manage orders.",
+        "priority": "high"
+      },
+      {
+        "name": "Customer Management",
+        "description": "Functionality to manage customers.",
+        "priority": "medium"
+      },
+      {
+        "name": "Shipping/Payment Management",
+        "description": "Functionality to manage shipping and payment options.",
+        "priority": "medium"
+      },
+      {
+        "name": "CMS",
+        "description": "Content Management System for managing website content.",
+        "priority": "medium"
+      },
+      {
+        "name": "Roles/Permissions",
+        "description": "Functionality to manage user roles and permissions.",
+        "priority": "medium"
+      },
+      {
+        "name": "Reporting (Statistics)",
+        "description": "Reporting and statistics functionality.",
+        "priority": "medium"
+      }
+    ],
+    "technical_details": {
+      "architecture": "Phased approach, utilizing different types of testing to ensure quality at various stages of development.",
+      "technology_stack": [],
+      "integrations": [
+        "Stripe Payment Gateway",
+        "Social Media Sharing",
+        "Email Verification/Notifications"
+      ],
+      "data_model": ""
+    },
+    "extraction_confidence": 0.95
+  },
+  {
+    "filename": "Use Case.pdf",
+    "document_type": "use_case",
+    "title": "Online Apparels Shopping Website Use Cases",
+    "summary": "This document outlines the use cases for an online apparels shopping website. It details the interactions of different actors, including Guest Users, Buyers, and Admin, with the system, covering functionalities like product discovery, registration, purchasing, order fulfillment, and system maintenance.",
+    "requirements": [
+      {
+        "id": "FR-003",
+        "description": "Product Discovery and Search",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-004",
+        "description": "Product Listing page",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-005",
+        "description": "Product Details page",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-009",
+        "description": "Product sharing on social media",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-001",
+        "description": "New Buyer Registration and Login",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-002",
+        "description": "Account verification and activation",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-007",
+        "description": "Add to cart and Shopping Cart functionality",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-008",
+        "description": "Checkout & Payment",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-006",
+        "description": "Add to Wishlist",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-012",
+        "description": "Track the order",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-011",
+        "description": "Ratings & Reviews",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-010",
+        "description": "My Account section",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-013",
+        "description": "Contact Support form",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-020",
+        "description": "Admin approval for feedback",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-018",
+        "description": "Product Categories management",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-019",
+        "description": "Products management",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-014",
+        "description": "Admin panel login",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-017",
+        "description": "Orders Management",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-021",
+        "description": "Statistics & Reports",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-024",
+        "description": "CMS Management",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-022",
+        "description": "System users Management",
+        "priority": "N/A",
+        "type": "functional"
+      },
+      {
+        "id": "FR-023",
+        "description": "Define roles for sub-users",
+        "priority": "N/A",
+        "type": "functional"
+      }
+    ],
+    "features": [],
+    "technical_details": {},
+    "extraction_confidence": 0.95
+  }
+]

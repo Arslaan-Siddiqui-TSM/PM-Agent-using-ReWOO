@@ -3,8 +3,6 @@ import fitz
 from config.llm_config import model
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
-from rich import box
 from rich.text import Text
 
 
@@ -49,7 +47,7 @@ def generate_feasibility_questions(document_text: str) -> str:
         document_text (str): The text content of the document.
 
     Returns:
-        str: The generated feasibility questions in markdown format.
+        str: The generated feasibility assessment in markdown format.
     """    
     prompt_path = os.path.join(os.path.dirname(__file__), "..", "prompts", "feasibility_prompt.txt")
     with open(prompt_path, "r", encoding="utf-8") as f:
@@ -90,53 +88,47 @@ def save_questions_to_markdown(questions_md: str, file_name: str, output_dir="ou
     os.makedirs(output_dir, exist_ok=True)
     # Derive a sane base name from the provided file path
     base = os.path.splitext(os.path.basename(file_name))[0]
-    output_path = os.path.join(output_dir, f"{base}_feasibility_questions.md")
+    output_path = os.path.join(output_dir, f"{base}.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(questions_md)
-    console.print(Panel(f"Feasibility questions saved to: [bold]{output_path}[/bold]", border_style="green"))
     return output_path
 
 
-def run_feasibility_agent(file_paths: list[str]) -> list[str]:
-    """Run the feasibility agent on the provided document files.
-
-    Args:
-        file_paths (list[str]): List of paths to the document files.
-
-    Returns:
-        list[str]: List of paths to the generated feasibility question files.
-    """
+def run_feasibility_agent(file_paths: list[str]) -> str:
+    """Run the feasibility agent on multiple documents, producing a single markdown file."""
     if not file_paths:
         console.print(Panel("No files provided for feasibility analysis.", border_style="yellow"))
-        return []
+        return ""
 
     console.rule("[bold blue]🔍 Feasibility Agent[/bold blue]")
-    console.print(f"[bold cyan]Reading project documents...[/bold cyan]")
-    docs_text = extract_text_from_pdfs(file_paths)
-    console.print(Panel(f"Extracted [bold]{len(docs_text)}[/bold] characters from documents.", border_style="cyan"))
+    console.print(f"[bold cyan]Reading {len(file_paths)} project document(s)...[/bold cyan]")
 
-    console.print(Panel("Generating feasibility questions for Tech Lead review...", border_style="magenta"))
+    # Combine text from all documents
+    docs_text = extract_text_from_pdfs(file_paths)
+    console.print(Panel(f"Extracted [bold]{len(docs_text)}[/bold] characters from all documents.", border_style="cyan"))
+
+    # Generate assessment once for all documents combined
+    console.print(Panel("Generating feasibility questions...", border_style="magenta"))
     questions_md = generate_feasibility_questions(docs_text)
 
-    paths = []
-    table = Table(title="Saved Output Files", box=box.ROUNDED)
-    table.add_column("#", style="bold cyan", width=4)
-    table.add_column("Input File", style="bold green")
-    table.add_column("Output File", style="bold yellow")
+    # Save into a single file
+    output_path = save_questions_to_markdown(questions_md, "feasibility_assessment.md")
+    console.print(Panel(f"Feasibility file saved to: [bold]{output_path}[/bold]", border_style="green"))
 
-    for idx, file_name in enumerate(file_paths, start=1):
-        path = save_questions_to_markdown(questions_md, file_name)
-        paths.append(path)
-        table.add_row(str(idx), file_name, path)
+    console.print(Panel(Text("Feasibility stage complete. Please review and fill in answers before proceeding.",
+                             justify="center"), border_style="green"))
+    return output_path
 
-    console.print(table)
-    console.print(Panel(Text("Feasibility stage complete. Please review and answer the questions before proceeding.", justify="center"), border_style="green"))
-    return paths or []
 
 
 if __name__ == "__main__":
-    # Example usage - simply change the file paths to test different BRDs
-    sample_files = [
-        "files/brd_1.pdf",
-    ]
-    questions_file = run_feasibility_agent(sample_files)
+    # Example usage - automatically reads all PDF files from the files directory
+    import glob
+    files_dir = "files"
+    sample_files = glob.glob(os.path.join(files_dir, "*.pdf"))
+    
+    if not sample_files:
+        console.print(f"[bold yellow]No PDF files found in {files_dir} directory[/bold yellow]")
+    else:
+        console.print(f"[bold cyan]Found {len(sample_files)} PDF files to process[/bold cyan]")
+        questions_file = run_feasibility_agent(sample_files)

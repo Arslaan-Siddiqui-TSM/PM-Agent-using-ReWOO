@@ -20,3 +20,9 @@ wheels/
 
 # Data files
 output/
+
+# Markdown files
+ARCHITECTURE_DIAGRAMS.md
+
+# cache
+cache/

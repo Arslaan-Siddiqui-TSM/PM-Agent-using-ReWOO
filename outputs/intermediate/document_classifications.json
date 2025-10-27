@@ -1,0 +1,38 @@
+[
+  {
+    "filename": "Functional Specification Document.pdf",
+    "filepath": "C:\\Arslaan\\work\\rewoo-demonstration\\files\\Functional Specification Document.pdf",
+    "document_type": "functional_specification",
+    "confidence": 0.95
+  },
+  {
+    "filename": "Non-Functional Requirement Document.pdf",
+    "filepath": "C:\\Arslaan\\work\\rewoo-demonstration\\files\\Non-Functional Requirement Document.pdf",
+    "document_type": "requirements_document",
+    "confidence": 0.95
+  },
+  {
+    "filename": "online_apparels_shopping_website.pdf",
+    "filepath": "C:\\Arslaan\\work\\rewoo-demonstration\\files\\online_apparels_shopping_website.pdf",
+    "document_type": "business_requirements",
+    "confidence": 0.95
+  },
+  {
+    "filename": "Technical Specification Document.pdf",
+    "filepath": "C:\\Arslaan\\work\\rewoo-demonstration\\files\\Technical Specification Document.pdf",
+    "document_type": "technical_specification",
+    "confidence": 0.95
+  },
+  {
+    "filename": "Test Plan.pdf",
+    "filepath": "C:\\Arslaan\\work\\rewoo-demonstration\\files\\Test Plan.pdf",
+    "document_type": "test_plan",
+    "confidence": 0.95
+  },
+  {
+    "filename": "Use Case.pdf",
+    "filepath": "C:\\Arslaan\\work\\rewoo-demonstration\\files\\Use Case.pdf",
+    "document_type": "use_case",
+    "confidence": 0.95
+  }
+]
