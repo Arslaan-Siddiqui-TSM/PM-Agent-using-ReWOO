@@ -1,6 +1,6 @@
 # ReWOO Demonstration Project
 
-A sophisticated implementation of the **ReWOO (Reasoning WithOut Observation)** paradigm using LangGraph, designed to generate comprehensive project plans from Business Requirement Documents (BRDs). This project demonstrates advanced agentic reasoning by decoupling planning from execution, enabling efficient multi-step reasoning with minimal LLM calls.
+An end-to-end implementation of the ReWOO (Reasoning WithOut Observation) paradigm using LangGraph, designed to turn multiple project documents (BRDs, specs, test plans, etc.) into a comprehensive project plan. This repo adds a Document Intelligence Pipeline that classifies, extracts, and analyzes PDFs to produce a clean planning context before ReWOO planning and execution.
 
 ## 📋 Table of Contents
 
@@ -17,6 +17,8 @@ A sophisticated implementation of the **ReWOO (Reasoning WithOut Observation)** 
 - [How It Works](#how-it-works)
 - [Components Deep Dive](#components-deep-dive)
 - [Output Format](#output-format)
+- [Testing](#testing)
+- [Known quirks](#known-quirks)
 - [Dependencies](#dependencies)
 - [Contributing](#contributing)
 - [License](#license)
@@ -25,31 +27,32 @@ A sophisticated implementation of the **ReWOO (Reasoning WithOut Observation)** 
 
 ## 🎯 Overview
 
-This project implements the **ReWOO (Reasoning WithOut Observation)** framework, which is an advanced reasoning pattern that separates planning from execution. It's specifically designed to analyze Business Requirement Documents (BRDs) and automatically generate structured, comprehensive project plans in Markdown format.
-
-### What is ReWOO?
-
-ReWOO is an agentic reasoning pattern that:
-
-- **Plans first**: Creates a complete execution plan upfront
-- **Executes sequentially**: Runs each step without re-planning
-- **Synthesizes results**: Combines all evidence into a final solution
-- **Minimizes LLM calls**: More efficient than traditional ReAct patterns
+This project implements the ReWOO (Reasoning WithOut Observation) framework, which is an advanced reasoning pattern that separates planning from execution. It's designed to analyze multiple project documents and automatically generate structured, comprehensive project plans in Markdown.
 
 This implementation uses:
 
-- **LangGraph** for orchestrating the reasoning workflow
-- **Google Gemini 2.5 Flash** for language model operations
-- **PyMuPDF** for PDF document processing
-- **Tavily Search** for web-based information retrieval
+- LangGraph for orchestrating the reasoning workflow
+- Google Gemini 2.0 Flash for language model operations
+- PyMuPDF for PDF document processing
+- Tavily Search for web-based information retrieval
+- A custom Document Intelligence Pipeline for classification, extraction, cross-doc analysis, and caching
 
 ---
 
 ## 🏗️ Architecture
 
-The project follows a **state-driven graph architecture** powered by LangGraph:
+The system combines a pre-processing intelligence pipeline with a state-driven ReWOO graph powered by LangGraph:
 
 ```
+              ┌──────────────────────────────────────────┐
+              │     Document Intelligence Pipeline       │
+              │  • Classification (LLM + caching)        │
+              │  • Content extraction (LLM + PyMuPDF)    │
+              │  • Cross-doc analysis (gaps/conflicts)   │
+              │  • Planning context generation           │
+              └──────────────────────────────────────────┘
+                                   │
+                                   ▼
 ┌─────────────────────────────────────────────────────────┐
 │                    ReWOO State                          │
 │  ┌──────────────────────────────────────────────────┐  │
@@ -58,6 +61,7 @@ The project follows a **state-driven graph architecture** powered by LangGraph:
 │  │ • steps: List[tuple]                              │  │
 │  │ • results: dict                                   │  │
 │  │ • result: str                                     │  │
+│  │ • document_context: str (from pipeline)           │  │
 │  └──────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
                           ↓
@@ -74,21 +78,42 @@ The project follows a **state-driven graph architecture** powered by LangGraph:
 
 ### Core Components
 
-1. **States** (`states/rewoo_state.py`): Pydantic model defining the agent's state
-2. **Planner** (`app/plan.py`): Generates multi-step reasoning plans
-3. **Tool Executor** (`app/tool_executor.py`): Executes tools (LLM, FileReader, Google Search)
-4. **Solver** (`app/solver.py`): Synthesizes results into final output
-5. **Graph** (`app/graph.py`): Orchestrates the workflow using LangGraph
-6. **Main** (`main.py`): Entry point with rich console output
+#### Why ReWOO over ReAct for this use case
+
+For multi-document planning (BRDs, specs, test plans) the plan-first nature of ReWOO is a better fit than ReAct’s stepwise observe-replan loop:
+
+- Fewer LLM calls and lower latency: We plan once, then execute deterministically. ReAct re-prompts at every step, repeatedly re-ingesting context.
+- Better use of Document Intelligence: The pipeline creates a compact planning context consumed once. ReAct would re-derive/merge context many times, increasing cost and drift.
+- Evidence reuse and consistency: ReWOO’s evidence IDs (#E1, #E2, …) let later steps reference prior results without recomputation, keeping outputs consistent across documents.
+- Reproducibility and caching: A fixed plan enables effective caching of classification/extraction/analysis and stable, auditable runs with a full Markdown execution log.
+
+1. States (`states/rewoo_state.py`): Pydantic model defining the agent's state
+2. Planner (`app/plan.py`): Generates multi-step reasoning plans (uses pipeline context if available)
+3. Tool Executor (`app/tool_executor.py`): Executes tools (LLM, FileReader, Google Search)
+4. Solver (`app/solver.py`): Synthesizes results into final output
+5. Graph (`app/graph.py`): Orchestrates the workflow using LangGraph
+6. Document Intelligence (`core/*`, `agents/*`): Smart pre-processing for planning
+7. Main (`main.py`): Entry point with rich console output and Markdown execution log
 
 ---
 
 ## 🔄 Project Flow
 
-### 1. **Planning Stage** 🧩
+### 0. Document Intelligence Stage (Recommended) 🧠
 
 ```
-Input: Task description (e.g., "Create project plan from BRD")
+Input: All PDFs in files/ directory
+      ↓
+Classifier → Extractor → Analyzer → Planning Context
+      ↓
+Output: Clean, consolidated planning context string
+        + Intermediate JSON/MD artifacts under outputs/intermediate/
+```
+
+### 1. Planning Stage 🧩
+
+```
+Input: Task description (+ feasibility notes + document context)
          ↓
    Planner reads planner_prompt.txt
          ↓
@@ -97,11 +122,13 @@ Input: Task description (e.g., "Create project plan from BRD")
    Output: Plan string + parsed steps
 ```
 
-**Example Plan:**
+If the intelligence pipeline ran, the planner uses the generated context instead of raw PDFs.
+
+Example Plan:
 
 ```
 Plan: Read the BRD document to extract raw text
-#E1 = FileReader['files/brd_1.pdf']
+#E1 = FileReader['files/Functional Specification Document.pdf']
 
 Plan: Identify key project epics from the BRD
 #E2 = LLM[Extract high-level modules from #E1]
@@ -111,7 +138,7 @@ Plan: Generate user stories for each epic
 ...
 ```
 
-### 2. **Tool Execution Stage** 🔧
+### 2. Tool Execution Stage 🔧
 
 ```
 For each step in the plan:
@@ -125,12 +152,12 @@ For each step in the plan:
     └── Store result with evidence ID
 ```
 
-**Conditional Routing:**
+Conditional Routing:
 
 - If more steps remain → Loop back to TOOL node
 - If all steps complete → Route to SOLVE node
 
-### 3. **Solving Stage** 🧠
+### 3. Solving Stage 🧠
 
 ```
 Input: All plans + all evidence results
@@ -148,15 +175,18 @@ Input: All plans + all evidence results
 
 ## ✨ Features
 
-- **🤖 Automated Planning**: Intelligent multi-step plan generation from prompts
-- **📄 PDF Processing**: Extracts and analyzes BRD documents using PyMuPDF
-- **🔍 Web Search Integration**: Tavily-powered search for domain clarifications
-- **🧠 LLM Reasoning**: Google Gemini 2.5 Flash for analysis and synthesis
-- **📊 Structured Output**: Comprehensive Markdown project plans with 8 sections
-- **🎨 Rich Console UI**: Beautiful terminal output with tables, panels, and progress indicators
-- **🔁 Stateful Execution**: LangGraph manages state transitions seamlessly
-- **🛡️ Error Handling**: Robust validation for query truncation and tool execution
-- **📦 Modular Design**: Clean separation of concerns across components
+- 🤖 Automated Planning: Intelligent multi-step plan generation from prompts
+- 🧠 Document Intelligence (NEW): Classify, extract, and analyze PDFs for a high-signal planning context
+- 🗃️ Caching: Persist classifications/extractions/analysis for faster subsequent runs
+- 📄 PDF Processing: Extracts and analyzes documents using PyMuPDF
+- 🔍 Web Search Integration: Tavily-powered search for domain clarifications
+- 🧠 LLM Reasoning: Google Gemini 2.0 Flash for analysis and synthesis
+- 📊 Structured Output: Comprehensive Markdown project plans with 8 sections
+- 📓 Full LLM Logs: All prompts/responses captured in a Markdown execution log
+- 🎨 Rich Console UI: Beautiful terminal output with tables, panels, and progress indicators
+- 🔁 Stateful Execution: LangGraph manages state transitions seamlessly
+- 🛡️ Error Handling: Robust validation for query truncation and tool execution
+- 📦 Modular Design: Clean separation of concerns across components
 
 ---
 
@@ -171,8 +201,18 @@ rewoo-demonstration/
 │   ├── solver.py                 # Solving node implementation
 │   └── tool_executor.py          # Tool execution node
 │
+├── core/                         # Document Intelligence Pipeline
+│   ├── document_intelligence_pipeline.py  # Orchestrates classify → extract → analyze
+│   ├── document_analyzer.py      # Cross-doc analysis and reporting
+│   └── cache_manager.py          # Caching for performance
+│
+├── agents/                       # LLM-based agents
+│   ├── document_classifier.py    # Content-based PDF classification
+│   └── content_extractor.py      # Type-aware content extraction
+│
 ├── config/                       # Configuration modules
-│   └── llm_config.py             # LLM setup (Google Gemini)
+│   ├── llm_config.py             # LLM setup (Google Gemini)
+│   └── document_intelligence_config.py  # Pipeline configuration
 │
 ├── states/                       # State definitions
 │   └── rewoo_state.py            # ReWOO state Pydantic model
@@ -181,20 +221,26 @@ rewoo-demonstration/
 │   └── search_tool.py            # Tavily search wrapper
 │
 ├── utils/                        # Helper utilities
-│   └── helper.py                 # Routing, task management, prompt loading
+│   └── helper.py                 # Routing, task mgmt, logging utils
 │
 ├── prompts/                      # LLM prompt templates
 │   ├── planner_prompt.txt        # Planning stage instructions
-│   └── solver_prompt.txt         # Solving stage instructions
+│   ├── solver_prompt.txt         # Solving stage instructions
+│   └── feasibility_prompt.txt    # Feasibility Q/A generator
 │
-├── files/                        # Input documents (BRDs)
-│   └── brd_1.pdf                 # Example BRD
+├── files/                        # Input documents (PDFs)
+│   └── ...                       # Place your PDFs here
 │
-├── outputs/                      # Generated project plans
-│   └── project_plan_*.md         # Timestamped Markdown outputs
+├── outputs/                      # Generated artifacts
+│   ├── project_plan_*.md         # Final project plans
+│   ├── agent_execution_log_*.md  # Full LLM prompts/responses log
+│   └── intermediate/             # Pipeline JSON/MD reports
 │
-├── main.py                       # Application entry point
+├── main.py                       # Application entry point (pipeline + ReWOO)
+├── generate_feasibility_questions.py  # Create feasibility assessment MD
+├── test_document_intelligence.py # Pipeline smoke test
 ├── pyproject.toml                # Project metadata and dependencies
+├── requirements.txt              # Frozen deps for pip installs
 ├── uv.lock                       # UV lock file
 └── README.md                     # This file
 ```
@@ -211,70 +257,42 @@ rewoo-demonstration/
 
 ### Using UV (Recommended)
 
-[UV](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
-
-1. **Install UV** (if not already installed):
+1. Install UV (if not already installed):
 
    ```bash
    # Windows (PowerShell)
    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-   # macOS/Linux
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-
-   # If your system does not have curl, you can use wget:
-   wget -qO- https://astral.sh/uv/install.sh | sh
    ```
 
-2. **Clone the repository**:
-
-   ```bash
-   git clone https://github.com/Arslaan-Siddiqui-TSM/PM-Agent-using-ReWOO.git
-   cd rewoo-demonstration
-   ```
-
-3. **Install dependencies**:
+2. From your project folder, install dependencies:
 
    ```bash
    uv sync
    ```
 
-4. **Activate the virtual environment**:
+3. Activate the virtual environment:
 
    ```bash
-   # Windows
+   # Windows (cmd.exe)
    .venv\Scripts\activate
-
-   # macOS/Linux
-   source .venv/bin/activate
    ```
 
 ### Using pip
 
-1. **Clone the repository**:
-
-   ```bash
-   git clone https://github.com/Arslaan-Siddiqui-TSM/PM-Agent-using-ReWOO.git
-   cd rewoo-demonstration
-   ```
-
-2. **Create a virtual environment**:
+1. Create a virtual environment:
 
    ```bash
    python -m venv venv
    ```
 
-3. **Activate the virtual environment**:
+2. Activate the virtual environment:
 
    ```bash
-   # Windows
+   # Windows (cmd.exe)
    venv\Scripts\activate
-
-   # macOS/Linux
-   source venv/bin/activate
    ```
 
-4. **Install dependencies**:
+3. Install dependencies:
 
    ```bash
    pip install -r requirements.txt
@@ -295,25 +313,25 @@ TAVILY_API_KEY=your_tavily_api_key_here
 
 ### API Keys Setup
 
-1. **Google Gemini API**:
+1. Google Gemini API:
 
-   - Visit [Google AI Studio](https://aistudio.google.com/app/api-keys)
+   - Visit https://aistudio.google.com/app/api-keys
    - Create a new API key
-   - Copy to `.env` file
+   - Copy to `.env`
 
-2. **Tavily API**:
-   - Sign up at [Tavily](https://tavily.com/)
+2. Tavily API:
+   - Sign up at https://tavily.com/
    - Get your API key from the dashboard
-   - Copy to `.env` file
+   - Copy to `.env`
 
 ### Model Configuration
 
-Edit `config/llm_config.py` to customize the LLM:
+By default we use Google Gemini 2.0 Flash (see `config/llm_config.py`). You can change model/temperature there:
 
 ```python
 model = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",  # Change model here
-    temperature=0.6,            # Adjust creativity (0.0-1.0)
+    model="gemini-2.0-flash",
+    temperature=0.6,
     google_api_key=GOOGLE_API_KEY
 )
 ```
@@ -324,59 +342,50 @@ model = ChatGoogleGenerativeAI(
 
 ### Basic Usage
 
-1. **Place your BRD** in the `files/` directory (e.g., `files/brd_1.pdf`, `files/brd_2.pdf`)
+1. Place your PDFs in the `files/` directory (any names; multiple files supported).
 
-2. **Edit `main.py`** to specify the document path:
-
-   ```python
-   if __name__ == "__main__":
-       run_agent(
-           document_path="files/brd_1.pdf",  # Change this to your BRD
-           task="Create implementation plan for the client project."
-       )
-   ```
-
-3. **Run the application**:
+2. (Recommended) Generate feasibility questions/assessment for Tech Lead review:
 
    ```bash
+   # Windows (cmd.exe)
+   python generate_feasibility_questions.py
+   ```
+
+   This creates `outputs/feasibility_assessment.md`. Review and optionally fill in answers.
+
+   Important: the current planner/solver looks for `outputs/feasibility_questions.md`. Until we consolidate names, either:
+
+   - Rename the generated file (Windows cmd):
+     - `ren outputs\feasibility_assessment.md feasibility_questions.md`
+   - OR update the code to point to your file.
+
+3. Run the main application (automatically processes all PDFs and uses the Document Intelligence Pipeline by default):
+
+   ```bash
+   # Windows (cmd.exe)
    python main.py
    ```
 
-4. **View the output**:
-   - Console: Real-time progress with rich formatting
-   - File: `outputs/project_plan_YYYYMMDD_HHMMSS.md`
+4. View the outputs:
+   - Final plan: `outputs/project_plan_YYYYMMDD_HHMMSS.md`
+   - Full execution log: `outputs/agent_execution_log_*.md`
+   - Intermediate artifacts: `outputs/intermediate/*`
 
-### Testing Different BRDs
+### Customizing the task and pipeline
 
-To test different documents, simply change the `document_path` parameter:
+In `main.py`, you can tweak:
 
-```python
-# Test with different BRD
-run_agent(document_path="files/brd_2.pdf")
+- `task` string passed to `run_agent`
+- `use_document_intelligence=True|False` to enable/disable the pipeline
+- `enable_cache=True|False` to control caching behavior
 
-# Test with custom task
-run_agent(
-    document_path="files/ecommerce_brd.pdf",
-    task="Create a detailed technical architecture plan"
-)
-```
+### Running Feasibility Agent directly
 
-### Running Feasibility Agent
-
-Edit `app/feasibility_agent.py` to specify documents:
-
-```python
-if __name__ == "__main__":
-    sample_files = [
-        "files/brd_1.pdf",  # Add your BRD paths here
-    ]
-    assessment_file = run_feasibility_agent(sample_files)
-```
-
-Then run:
+You can also run the agent directly on your current `files/*.pdf` via:
 
 ```bash
-python app/feasibility_agent.py
+# Windows (cmd.exe)
+python app\feasibility_agent.py
 ```
 
 ### Console Output
@@ -391,8 +400,8 @@ The application provides beautiful formatted output:
 ═══════════════ 🧩 Planning Stage ═══════════════
 ┌─── Generated Plan ───────────────────────────┐
 │ Plan: Read the BRD document...               │
-│ #E1 = FileReader['files/brd_1.pdf']          │
-│ ...                                           │
+│ #E1 = FileReader['files/...']                │
+│ ...                                          │
 └───────────────────────────────────────────────┘
 
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
@@ -411,7 +420,7 @@ The application provides beautiful formatted output:
 ═══════════════ 🧠 Final Solution ═══════════════
 ┌─── Final Answer ─────────────────────────────┐
 │ # Complete Project Plan                      │
-│ ...                                           │
+│ ...                                          │
 └───────────────────────────────────────────────┘
 ```
 
@@ -421,25 +430,23 @@ The application provides beautiful formatted output:
 
 ### ReWOO Pattern Explained
 
-1. **Separation of Planning and Execution**:
+1. Separation of Planning and Execution:
 
    - Traditional ReAct: Plan → Observe → Plan → Observe (multiple LLM calls)
    - ReWOO: Plan all → Execute all → Solve (fewer LLM calls, more efficient)
 
-2. **Evidence-Based Reasoning**:
+2. Evidence-Based Reasoning:
 
    - Each step produces evidence (e.g., #E1, #E2)
    - Subsequent steps reference previous evidence
    - Final solver uses all evidence to generate output
 
-3. **Tool Orchestration**:
-   - **FileReader**: Reads PDF documents, extracts text
-   - **LLM**: Performs reasoning, analysis, extraction
-   - **Google**: Searches web for clarifications (max 400 chars)
+3. Tool Orchestration:
+   - FileReader: Reads PDF documents, extracts text
+   - LLM: Performs reasoning, analysis, extraction
+   - Google: Searches web for clarifications (max 400 chars)
 
 ### State Management
-
-The `ReWOO` state object flows through the graph:
 
 ```python
 class ReWOO(BaseModel):
@@ -448,6 +455,7 @@ class ReWOO(BaseModel):
     steps: List[tuple]     # Parsed steps [(plan, evidence_id, tool, input)]
     results: dict          # Execution results {evidence_id: result}
     result: str            # Final synthesized output
+    document_context: str  # Context from Document Intelligence Pipeline (if enabled)
 ```
 
 ### Routing Logic
@@ -467,16 +475,18 @@ def route(state):
 
 ### 1. Planner (`app/plan.py`)
 
-**Purpose**: Generate structured multi-step reasoning plans
+Purpose: Generate structured multi-step reasoning plans
 
-**Process**:
+Process:
 
 1. Loads `planner_prompt.txt`
-2. Invokes LLM with task description
+2. Invokes LLM with task description and either:
+   - Document Intelligence context (preferred)
+   - or legacy raw PDF text from `files/`
 3. Parses output using regex: `Plan:\s*(.+)\s*(#E\d+)\s*=\s*(\w+)\s*\[([^\]]+)\]`
 4. Returns structured steps
 
-**Example Output**:
+Example Output:
 
 ```python
 {
@@ -491,74 +501,65 @@ def route(state):
 
 ### 2. Tool Executor (`app/tool_executor.py`)
 
-**Purpose**: Execute tools defined in the plan
+Purpose: Execute tools defined in the plan
 
-**Supported Tools**:
+Supported Tools:
 
-- **FileReader**:
+- FileReader (PyMuPDF)
+- LLM (Gemini 2.0 Flash)
+- Google (Tavily Search; query truncated to 400 chars)
 
-  ```python
-  with fitz.open(file_path) as doc:
-      text = "".join(page.get_text("text") for page in doc)
-  ```
-
-- **LLM**:
-
-  ```python
-  result = model.invoke(tool_input)
-  ```
-
-- **Google**:
-  ```python
-  # Truncates query to 400 chars if needed
-  result = search.invoke(tool_input)
-  ```
-
-**Dependency Resolution**:
+Dependency Resolution:
 
 - Replaces `#E1`, `#E2`, etc. with actual results
 - Example: `"Analyze #E1"` → `"Analyze [actual BRD text]"`
 
 ### 3. Solver (`app/solver.py`)
 
-**Purpose**: Synthesize final project plan from all evidence
+Purpose: Synthesize final project plan from all evidence
 
-**Process**:
+Process:
 
 1. Combines all plans and results
 2. Loads `solver_prompt.txt`
 3. Invokes LLM with complete context
 4. Saves output to `outputs/project_plan_TIMESTAMP.md`
 
-**Generated Sections**:
+Sections Generated:
 
-1. Project Overview
-2. Epics/Modules
-3. Functional Requirements (User Stories)
-4. Non-Functional Requirements
-5. Dependencies & Constraints
-6. Risks & Assumptions
-7. Project Milestones
-8. Summary
+- Project Overview
+- Epics/Modules
+- Functional Requirements (User Stories)
+- Non-Functional Requirements
+- Dependencies & Constraints
+- Risks & Assumptions
+- Project Milestones
+- Summary
 
 ### 4. Graph (`app/graph.py`)
 
-**Purpose**: Orchestrate the workflow using LangGraph
+Purpose: Orchestrate the workflow using LangGraph
 
-**Nodes**:
+Nodes:
 
 - `plan`: Planning stage
 - `tool`: Tool execution (with loop)
 - `solve`: Final synthesis
 
-**Edges**:
+Edges:
 
-- `START → plan`: Initialize
-- `plan → tool`: Execute first tool
-- `tool → (conditional)`: Route based on completion
-  - If incomplete → `tool` (loop)
-  - If complete → `solve`
-- `solve → END`: Finish
+- `START → plan`
+- `plan → tool`
+- `tool → (conditional: tool or solve)`
+- `solve → END`
+
+### 5. Document Intelligence (`core/*`, `agents/*`)
+
+- `core/document_intelligence_pipeline.py`: Orchestrates classification, extraction, and analysis with caching
+- `agents/document_classifier.py`: Content-only classification (ignores filename)
+- `agents/content_extractor.py`: Type-aware extraction into a structured JSON-like schema
+- `core/document_analyzer.py`: Finds gaps/conflicts, consolidates risks/dependencies/constraints, produces Markdown/JSON reports
+- `core/cache_manager.py`: Caches per-file results and analysis for speed
 
 ---
 
@@ -629,22 +630,49 @@ Overall assessment and next steps
 
 ---
 
+## 🧪 Testing
+
+Run the pipeline smoke test and legacy loader test:
+
+```bash
+# Windows (cmd.exe)
+python test_document_intelligence.py
+```
+
+Expected artifacts will be written under `outputs/test_intermediate/` and console will display coverage/readiness/confidence.
+
+## ⚠️ Known quirks
+
+- Feasibility file name mismatch: `generate_feasibility_questions.py` writes `outputs/feasibility_assessment.md` but the planner/solver currently read `outputs/feasibility_questions.md`. Until unified, please rename the file after generation (see Usage), or adjust the code paths in `app/plan.py` and `app/solver.py`.
+- Python 3.13 required (see `pyproject.toml`). If your default `python` points to an older version, use `py -3.13` on Windows when creating the venv.
+
+## 🧩 Dependencies
+
+Key libraries (see `requirements.txt` / `pyproject.toml`):
+
+- langgraph, langchain-core/community, langchain-google-genai, langchain-tavily
+- PyMuPDF (fitz)
+- rich, python-dotenv
+- numpy, pydantic, pyyaml, requests
+
+Python version: `>=3.13`
+
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how you can help:
+Contributions are welcome! Typical flow:
 
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Commit your changes**: `git commit -m 'Add amazing feature'`
-4. **Push to the branch**: `git push origin feature/amazing-feature`
-5. **Open a Pull Request**
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m "Add amazing feature"`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ## 🙏 Acknowledgments
 
-- **ReWOO Paper**: [Reasoning WithOut Observation](https://arxiv.org/abs/2305.18323)
-- **LangGraph**: State-of-the-art agent orchestration
-- **Google Gemini**: Powerful language model capabilities
-- **Tavily**: Advanced AI search API
+- ReWOO Paper: https://arxiv.org/abs/2305.18323
+- LangGraph: State-of-the-art agent orchestration
+- Google Gemini: Powerful language model capabilities
+- Tavily: Advanced AI search API
 
 ---
 
@@ -654,5 +682,3 @@ For assessment, issues, or feature requests:
 
 - Open an issue on GitHub
 - Contact the maintainers
-
----
