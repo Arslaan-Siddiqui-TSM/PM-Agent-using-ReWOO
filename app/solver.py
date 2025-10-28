@@ -40,7 +40,6 @@ def solve(state: ReWOO):
     # Fill the prompt with dynamic data
     formatted_prompt = solve_prompt.format(
         plan=plan,
-        task=state.task,
         feasibility_context=feasibility_context
     )
 
@@ -55,7 +54,6 @@ def solve(state: ReWOO):
             prompt=formatted_prompt,
             response=str(result.content),
             additional_context={
-                "Task": state.task,
                 "Number of Steps": len(state.steps) if state.steps else 0,
                 "Plan Length": f"{len(plan)} characters",
                 "Feasibility Context Length": f"{len(feasibility_context)} characters"

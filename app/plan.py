@@ -22,7 +22,6 @@ def get_plan(state: ReWOO) -> dict:
         prompt_template = f.read()
 
     # Load task and feasibility notes
-    task = state.task
     feasibility_context = load_feasibility_answers("outputs/feasibility_questions.md") or "No feasibility answers available yet."
     
     # Use intelligent document context if available, otherwise use legacy loading
@@ -37,7 +36,6 @@ def get_plan(state: ReWOO) -> dict:
 
     # Fill the placeholders
     formatted_prompt = prompt_template.format(
-        task=task, 
         feasibility_context=feasibility_context,
         documents_context=documents_context
     )
@@ -53,7 +51,6 @@ def get_plan(state: ReWOO) -> dict:
             prompt=formatted_prompt,
             response=result.content,
             additional_context={
-                "Task": task,
                 "Context Source": context_source,
                 "Feasibility Context Length": f"{len(feasibility_context)} characters",
                 "Documents Context Length": f"{len(documents_context)} characters"
