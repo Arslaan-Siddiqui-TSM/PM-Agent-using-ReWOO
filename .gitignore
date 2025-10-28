@@ -19,7 +19,8 @@ wheels/
 *.lock
 
 # Data files
-output/
+outputs/
+uploads/
 
 # Markdown files
 ARCHITECTURE_DIAGRAMS.md
