@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field
 
 
 class ReWOO(BaseModel):
-    task: Optional[str] = Field(None, description="The task to be accomplished")
     plan_string: Optional[str] = Field(None, description="The plan to achieve the task")
     steps: List = Field(description="The steps to follow in the plan", default_factory=list)
     results: dict = Field(description="The results of each step", default_factory=dict)
