@@ -14,8 +14,7 @@ import os
 import glob
 
 
-def run_agent(task: str = "Create implementation plan for the client project.", 
-              use_document_intelligence: bool = True,
+def run_agent(use_document_intelligence: bool = True,
               enable_cache: bool = True):
     """
     Run the ReWOO agent with all documents in the files directory.
@@ -40,7 +39,7 @@ def run_agent(task: str = "Create implementation plan for the client project.",
     
     # Initialize markdown logger
     md_logger = MarkdownLogger(output_dir="outputs")
-    md_logger.start(task, pdf_files, "outputs/feasibility_assessment.md")
+    md_logger.start("ReWOO Agent Execution Started", pdf_files, "outputs/feasibility_assessment.md")
     
     # Set as global logger so other modules can access it
     set_global_logger(md_logger)
@@ -58,6 +57,22 @@ def run_agent(task: str = "Create implementation plan for the client project.",
         # Generate comprehensive planning context
         document_context = pipeline.get_planning_context(pipeline_result)
         
+        feasibility_file = "outputs/feasibility_assessment.md"
+        if os.path.exists(feasibility_file):
+            with open(feasibility_file, "r", encoding="utf-8") as f:
+                feasibility_content = f.read()
+            
+            # Combine contexts
+            document_context = f"""{document_context}
+
+        ## FEASIBILITY ASSESSMENT:
+
+        {feasibility_content}
+        """
+            console.print("[green]✓ Loaded feasibility assessment[/green]")
+        else:
+            console.print("[yellow]⚠️  No feasibility assessment found[/yellow]")
+
         console.print("\n[green]✓ Document Intelligence Pipeline completed[/green]")
         console.print(f"[dim]Analysis report saved to: outputs/intermediate/document_analysis_report.md[/dim]\n")
     else:
@@ -69,7 +84,6 @@ def run_agent(task: str = "Create implementation plan for the client project.",
     console.print(f"[bold cyan]🟡 Processing {len(pdf_files)} documents from files/ directory:[/bold cyan]")
     for pdf_file in sorted(pdf_files):
         console.print(f"   • {os.path.basename(pdf_file)}")
-    console.print(f"[bold cyan]📋 Task:[/bold cyan] {task}")
     console.print(f"[bold cyan]💡 Feasibility Context:[/bold cyan] outputs/feasibility_assessment.md")
     if use_document_intelligence:
         console.print(f"[bold cyan]🧠 Document Intelligence:[/bold cyan] ENABLED")
@@ -77,10 +91,10 @@ def run_agent(task: str = "Create implementation plan for the client project.",
     
     # Create initial state with document context
     initial_state = ReWOO(
-        task=task,
         plan_string=None,
         result=None,
-        document_context=document_context
+        document_context=document_context,
+        feasibility_file_path="outputs/feasibility_assessment.md"
     )
     
     app = get_graph(initial_state)
@@ -161,7 +175,6 @@ if __name__ == "__main__":
     # Set use_document_intelligence=False to use legacy raw document loading
     
     run_agent(
-        task="Create implementation plan for the client project.",
         use_document_intelligence=True,  # Use intelligent document processing
         enable_cache=True  # Enable caching for faster runs
     )
