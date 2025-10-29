@@ -8,6 +8,7 @@ class ReWOO(BaseModel):
     results: dict = Field(description="The results of each step", default_factory=dict)
     result: Optional[str] = Field(None, description="The final result of the task")
     document_context: Optional[str] = Field(None, description="Intelligent document analysis context")
+    feasibility_file_path: Optional[str] = Field(None, description="Path to the feasibility assessment file")
 
     def __getitem__(self, item):
         return getattr(self, item)

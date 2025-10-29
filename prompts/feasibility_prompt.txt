@@ -15,7 +15,9 @@ that includes:
 4. **Recommended Timeline**: Realistic timeline estimate
 5. **Critical Questions**: 5-7 questions that must be answered before planning if necessary
 
-Return your result in well-formatted Markdown.
+Return your result in well-formatted Markdown. DO NOT wrap the output in backticks (i.e. ```markdown...```)
+
+DO NOT include any other text other than the feasibility assessment (e.g. Okay, I've reviewed the provided documents (BRD, FSD, NFRD, TSD, Test Plan, and Use Case Document). Here's a feasibility assessment etc.)
 
 ---
 

@@ -35,7 +35,9 @@ def solve(state: ReWOO):
         solve_prompt = f.read()
 
     # Load feasibility context (if available)
-    feasibility_context = load_feasibility_answers("outputs/feasibility_questions.md") or "No feasibility notes available yet."
+    # Use the feasibility file path from state if available
+    feasibility_file_path = state.feasibility_file_path or "outputs/feasibility_assessment.md"
+    feasibility_context = load_feasibility_answers(feasibility_file_path) or "No feasibility notes available yet."
 
     # Fill the prompt with dynamic data
     formatted_prompt = solve_prompt.format(

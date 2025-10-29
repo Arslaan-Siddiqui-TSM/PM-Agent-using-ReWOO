@@ -22,7 +22,9 @@ def get_plan(state: ReWOO) -> dict:
         prompt_template = f.read()
 
     # Load task and feasibility notes
-    feasibility_context = load_feasibility_answers("outputs/feasibility_questions.md") or "No feasibility answers available yet."
+    # Use the feasibility file path from state if available
+    feasibility_file_path = state.feasibility_file_path or "outputs/feasibility_assessment.md"
+    feasibility_context = load_feasibility_answers(feasibility_file_path) or "No feasibility answers available yet."
     
     # Use intelligent document context if available, otherwise use legacy loading
     if state.document_context:
