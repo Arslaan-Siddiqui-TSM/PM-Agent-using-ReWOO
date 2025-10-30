@@ -42,6 +42,7 @@ class GeneratePlanResponse(BaseModel):
     plan: Dict[str, Any]
     evidence: Dict[str, Any]
     result: str
+    file_path: Optional[str] = Field(None, description="Path to the saved final project plan markdown file")
     steps: List[str]
     execution_time: float
 
@@ -235,8 +236,38 @@ async def check_feasibility(request: FeasibilityRequest):
         
         # Step 2: Generate feasibility assessment using LLM
         print("Step 2: Generating feasibility assessment with LLM")
-        feasibility_assessment = generate_feasibility_questions(docs_text)
-        print("Feasibility assessment generated")
+        
+        max_retries = 3
+        retry_delay = 5
+        feasibility_assessment = None
+        
+        for attempt in range(max_retries):
+            try:
+                feasibility_assessment = generate_feasibility_questions(docs_text)
+                print("Feasibility assessment generated")
+                break
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "Resource exhausted" in error_msg:
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        print(f"Rate limit hit. Waiting {wait_time} seconds before retry {attempt + 1}/{max_retries}...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"Max retries reached. Rate limit still active.")
+                        raise HTTPException(
+                            status_code=429,
+                            detail=f"Google Gemini API rate limit exceeded during feasibility check. Please try again in a few minutes."
+                        )
+                else:
+                    # Not a rate limit error, re-raise immediately
+                    raise
+        
+        if feasibility_assessment is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to generate feasibility assessment"
+            )
         
         # Step 3: Save feasibility assessment to file
         print("Step 3: Saving feasibility assessment to file")
@@ -359,11 +390,44 @@ async def generate_plan(request: GeneratePlanRequest):
             feasibility_file_path=session.feasibility_file_path  # Pass the file path to state
         )
         
-        # Step 4: Execute the ReWOO graph
-        print("Step 4: Executing ReWOO graph")
+        # Step 4: Execute the ReWOO graph with streaming (same as CLI)
+        print("Step 4: Executing ReWOO graph with streaming")
         graph = get_graph(rewoo_state)
-        final_state = graph.invoke(rewoo_state)
-        print("ReWOO graph execution completed")
+        
+        # Use .stream() like the CLI script does - this adds natural delays between nodes
+        # and prevents rapid-fire LLM calls that trigger rate limits
+        final_state = None
+        node_count = 0
+        try:
+            for s in graph.stream(rewoo_state):
+                node_name = next(iter(s))
+                data = s[node_name]
+                node_count += 1
+                print(f"Completed node {node_count}: {node_name}")
+                
+                # Add a small delay between tool nodes to prevent rate limiting
+                # when there are many sequential tool executions
+                if node_name == "tool" and node_count > 5:
+                    time.sleep(0.5)  # 500ms delay after 5th tool to space out calls
+                
+                final_state = s
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "Resource exhausted" in error_msg:
+                print(f"Rate limit error during graph execution: {error_msg}")
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Google Gemini API rate limit exceeded. Please try again in a few minutes."
+                )
+            else:
+                print(f"Error during graph execution: {error_msg}")
+                raise
+        
+        if final_state is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to execute ReWOO graph - no final state returned"
+            )
         
         execution_time = time.time() - start_time
         print(f"Plan generation completed in {execution_time:.2f}s")
@@ -381,12 +445,27 @@ async def generate_plan(request: GeneratePlanRequest):
         evidence_dict = final_state.get('results', {})
         
         result_str = final_state.get('result', "No result generated")
-        
+
+        # Persist the final result to a markdown file for downstream consumption
+        output_dir = Path("outputs")
+        output_dir.mkdir(exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        plan_filename = f"project_plan_{request.session_id[:8]}_{ts}.md"
+        plan_filepath = output_dir / plan_filename
+        try:
+            with plan_filepath.open("w", encoding="utf-8") as f:
+                f.write(str(result_str).strip())
+            print(f"Final project plan saved to: {plan_filepath}")
+        except Exception as e:
+            print(f"WARNING: Failed to write project plan file: {e}")
+            plan_filepath = None
+
         return GeneratePlanResponse(
             session_id=request.session_id,
             plan=plan_dict,
             evidence=evidence_dict,
             result=result_str,
+            file_path=str(plan_filepath) if plan_filepath else None,
             steps=steps,
             execution_time=execution_time
         )
