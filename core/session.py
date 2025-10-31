@@ -9,6 +9,8 @@ class Session:
         session_id: Unique identifier for the session
         created_at: Timestamp when session was created
         document_paths: List of paths to uploaded documents
+        pre_feasibility_questions: Strategic questions generated before feasibility assessment
+        pre_feasibility_file_path: Path to saved pre-feasibility questions file
         feasibility_assessment: Generated feasibility assessment text
         feasibility_file_path: Path to saved feasibility assessment file
         pipeline_result: Result from Document Intelligence Pipeline
@@ -18,6 +20,8 @@ class Session:
         self.session_id = session_id
         self.created_at = datetime.now()
         self.document_paths = []
+        self.pre_feasibility_questions = None
+        self.pre_feasibility_file_path = None
         self.feasibility_assessment = None
         self.feasibility_file_path = None
         self.pipeline_result = None

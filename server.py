@@ -6,9 +6,9 @@ from routes.health_check import router as health_router
 
 # Create FastAPI app
 app = FastAPI(
-    title="ReWOO Agent API",
-    description="API for document-based project planning using ReWOO agent",
-    version="1.0.0"
+    title="Reflection Agent API",
+    description="API for document-based project planning using Reflection agent pattern (draft→critique→revise cycles)",
+    version="2.0.0"
 )
 
 # Add CORS middleware
@@ -29,9 +29,10 @@ app.include_router(health_router, prefix="/health", tags=["health"])
 @app.get("/")
 async def root():
     return {
-        "message": "ReWOO Agent API",
+        "message": "Reflection Agent API - Iterative draft→critique→revise workflow",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "version": "2.0.0"
     }
 
 if __name__ == "__main__":

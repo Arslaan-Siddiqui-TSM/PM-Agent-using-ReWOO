@@ -9,6 +9,8 @@ async def health_check():
     """Check if the API is running"""
     return {
         "status": "healthy",
-        "service": "ReWOO Agent API",
+        "service": "Reflection Agent API",
+        "version": "2.0.0",
+        "pattern": "draft→critique→revise",
         "timestamp": time.time()
     }

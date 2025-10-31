@@ -49,6 +49,104 @@ def extract_text_from_pdfs(file_paths: list[str]) -> str:
     return all_text.strip()
 
 
+def generate_pre_feasibility_questions(document_text: str) -> dict:
+    """Generate strategic questions to assess project feasibility before detailed analysis.
+    
+    Args:
+        document_text (str): The text content of the document.
+        
+    Returns:
+        dict: Dictionary with categories as keys and lists of questions as values.
+    """
+    import json
+    
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Starting pre-feasibility question generation")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Input document text length: {len(document_text)} characters")
+    
+    # Limit context to avoid token limits
+    truncated_text = document_text[:15000]
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Truncating document text to {len(truncated_text)} characters")
+    
+    prompt = f"""You are a strategic project analyst. Based on the provided project documents, generate critical feasibility questions across multiple dimensions.
+
+PROJECT DOCUMENTS:
+{truncated_text}
+
+TASK:
+Generate 3-5 strategic questions for EACH of the following categories:
+
+1. Technical Feasibility - Can this be built with available technology?
+2. Financial Viability - Is this financially sustainable?
+3. Resource Availability - Do we have the necessary resources?
+4. Timeline Constraints - Is the timeline realistic?
+5. Risk Factors - What are the major risks?
+6. Stakeholder Impact - How will this affect stakeholders?
+
+RESPONSE FORMAT (JSON):
+{{
+    "Technical Feasibility": ["question 1", "question 2", ...],
+    "Financial Viability": ["question 1", "question 2", ...],
+    "Resource Availability": ["question 1", "question 2", ...],
+    "Timeline Constraints": ["question 1", "question 2", ...],
+    "Risk Factors": ["question 1", "question 2", ...],
+    "Stakeholder Impact": ["question 1", "question 2", ...]
+}}
+
+Make questions specific to the project context, actionable, and strategic.
+Return ONLY valid JSON, no markdown formatting or code blocks."""
+    
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Final prompt length: {len(prompt)} characters")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Invoking LLM model...")
+    
+    response_text = ""
+    try:
+        result = model.invoke(prompt)
+        console.print(f"[bold green]DEBUG:[/bold green] LLM invocation successful")
+        
+        content = getattr(result, "content", result)
+        response_text = str(content).strip()
+        
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Response length: {len(response_text)} characters")
+        
+        # Extract JSON from markdown code blocks if present
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+            console.print(f"[bold yellow]DEBUG:[/bold yellow] Extracted JSON from markdown block")
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+            console.print(f"[bold yellow]DEBUG:[/bold yellow] Extracted content from markdown block")
+        
+        # Parse JSON response
+        questions_dict = json.loads(response_text)
+        console.print(f"[bold green]DEBUG:[/bold green] Successfully parsed JSON with {len(questions_dict)} categories")
+        
+        return questions_dict
+        
+    except json.JSONDecodeError as e:
+        console.print(f"[bold red]DEBUG ERROR:[/bold red] Failed to parse JSON response: {e}")
+        console.print(f"[bold red]Response text:[/bold red] {response_text[:500]}...")
+        # Return fallback structure
+        return {
+            "Technical Feasibility": [],
+            "Financial Viability": [],
+            "Resource Availability": [],
+            "Timeline Constraints": [],
+            "Risk Factors": [],
+            "Stakeholder Impact": []
+        }
+    except Exception as e:
+        console.print(f"[bold red]DEBUG ERROR:[/bold red] LLM invocation failed: {e}")
+        # Return fallback structure
+        return {
+            "Technical Feasibility": [],
+            "Financial Viability": [],
+            "Resource Availability": [],
+            "Timeline Constraints": [],
+            "Risk Factors": [],
+            "Stakeholder Impact": []
+        }
+
+
 def generate_feasibility_questions(document_text: str) -> str:
     """Generate feasibility questions for the Tech Lead review.
 

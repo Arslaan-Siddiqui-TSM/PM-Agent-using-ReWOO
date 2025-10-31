@@ -13,7 +13,7 @@ from utils.constants import UPLOAD_DIR
 
 # Import your existing components
 from app.graph import get_graph
-from states.rewoo_state import ReWOO
+from states.reflection_state import ReflectionState
 from core.document_intelligence_pipeline import DocumentIntelligencePipeline
 
 router = APIRouter()
@@ -27,6 +27,19 @@ class UploadResponse(BaseModel):
     total_files: int
 
 
+class PreFeasibilityRequest(BaseModel):
+    session_id: str = Field(..., description="Session ID from upload response")
+    use_intelligent_processing: bool = Field(True, description="Use Document Intelligence Pipeline for processing")
+
+
+class PreFeasibilityResponse(BaseModel):
+    session_id: str
+    questions: Dict[str, List[str]]
+    message: str
+    execution_time: float
+    file_path: Optional[str] = Field(None, description="Path to the saved questions file")
+
+
 class FeasibilityRequest(BaseModel):
     session_id: str = Field(..., description="Session ID from upload response")
     use_intelligent_processing: bool = Field(True, description="Use Document Intelligence Pipeline for processing")
@@ -35,6 +48,7 @@ class FeasibilityRequest(BaseModel):
 class GeneratePlanRequest(BaseModel):
     session_id: str = Field(..., description="Session ID from upload response")
     use_intelligent_processing: bool = Field(True, description="Use Document Intelligence Pipeline for processing")
+    max_iterations: int = Field(5, description="Maximum number of reflection iterations (default: 5)", ge=1, le=10)
 
 
 class GeneratePlanResponse(BaseModel):
@@ -45,6 +59,8 @@ class GeneratePlanResponse(BaseModel):
     file_path: Optional[str] = Field(None, description="Path to the saved final project plan markdown file")
     steps: List[str]
     execution_time: float
+    iterations_completed: int = Field(description="Number of reflection iterations completed")
+    status: str = Field(description="Status of plan generation (completed/partial)")
 
 
 # Endpoint 1: Upload Documents (Creates Session)
@@ -180,7 +196,152 @@ async def upload_documents(
         )
 
 
-# Endpoint 2: Feasibility Check
+# Endpoint 2: Generate Pre-Feasibility Questions
+@router.post("/pre-feasibility-questions", response_model=PreFeasibilityResponse)
+async def generate_pre_feasibility_questions_endpoint(request: PreFeasibilityRequest):
+    """
+    Generate strategic questions to assess project feasibility before detailed analysis.
+    These questions help identify key concerns across multiple dimensions:
+    - Technical Feasibility
+    - Financial Viability
+    - Resource Availability
+    - Timeline Constraints
+    - Risk Factors
+    - Stakeholder Impact
+    
+    The generated questions will be used to guide the detailed feasibility assessment.
+    """
+    print(f"Pre-feasibility questions requested for session: {request.session_id}")
+    start_time = time.time()
+    
+    # Get session
+    session = sessions.get(request.session_id)
+    if not session:
+        print(f"Session not found: {request.session_id}")
+        raise HTTPException(
+            status_code=404,
+            detail="Session not found. Please upload documents first."
+        )
+    
+    if session.is_expired():
+        print(f"Session expired: {request.session_id}")
+        raise HTTPException(
+            status_code=410,
+            detail="Session expired. Please upload documents again."
+        )
+    
+    try:
+        # Import necessary functions
+        from app.feasibility_agent import extract_text_from_pdfs, generate_pre_feasibility_questions
+        
+        # Step 1: Process documents
+        print(f"Step 1: Processing documents (intelligent_processing={request.use_intelligent_processing})")
+        
+        if request.use_intelligent_processing:
+            print("Using Document Intelligence Pipeline for structured processing")
+            pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+            pipeline_result = pipeline.process_documents(
+                session.document_paths,
+                output_dir="outputs/intermediate"
+            )
+            
+            # Store pipeline result in session for later use
+            session.pipeline_result = pipeline_result
+            print(f"Pipeline processed {len(pipeline_result.get('classifications', []))} documents")
+            
+            # Get structured context
+            docs_text = pipeline.get_planning_context(pipeline_result)
+            print(f"Generated structured context: {len(docs_text)} characters")
+        else:
+            print("Using raw text extraction")
+            docs_text = extract_text_from_pdfs(session.document_paths)
+            print(f"Extracted {len(docs_text)} characters from documents")
+        
+        # Step 2: Generate strategic questions using LLM
+        print("Step 2: Generating strategic feasibility questions with LLM")
+        
+        max_retries = 3
+        retry_delay = 5
+        questions_dict = None
+        
+        for attempt in range(max_retries):
+            try:
+                questions_dict = generate_pre_feasibility_questions(docs_text)
+                print("Pre-feasibility questions generated successfully")
+                break
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "Resource exhausted" in error_msg:
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        print(f"Rate limit hit. Waiting {wait_time} seconds before retry {attempt + 1}/{max_retries}...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"Max retries reached. Rate limit still active.")
+                        raise HTTPException(
+                            status_code=429,
+                            detail=f"Google Gemini API rate limit exceeded. Please try again in a few minutes."
+                        )
+                else:
+                    raise
+        
+        if questions_dict is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to generate pre-feasibility questions"
+            )
+        
+        # Step 3: Save questions to file
+        print("Step 3: Saving pre-feasibility questions to file")
+        output_dir = Path("outputs")
+        output_dir.mkdir(exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"pre_feasibility_questions_{request.session_id[:8]}_{timestamp}.md"
+        file_path = output_dir / filename
+        
+        # Format questions as markdown
+        markdown_content = "# Pre-Feasibility Assessment Questions\n\n"
+        markdown_content += f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        markdown_content += f"Session ID: {request.session_id}\n\n"
+        markdown_content += "---\n\n"
+        
+        for category, questions in questions_dict.items():
+            markdown_content += f"## {category}\n\n"
+            for i, question in enumerate(questions, 1):
+                markdown_content += f"{i}. {question}\n"
+            markdown_content += "\n"
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+        
+        print(f"Pre-feasibility questions saved to: {file_path}")
+        
+        # Step 4: Store in session
+        print("Step 4: Storing questions in session")
+        session.pre_feasibility_questions = questions_dict
+        session.pre_feasibility_file_path = str(file_path)
+        
+        execution_time = time.time() - start_time
+        print(f"Pre-feasibility questions generation completed in {execution_time:.2f}s")
+        
+        return PreFeasibilityResponse(
+            session_id=request.session_id,
+            questions=questions_dict,
+            message=f"Strategic feasibility questions generated successfully and saved to {filename}",
+            file_path=str(file_path),
+            execution_time=execution_time
+        )
+        
+    except Exception as e:
+        print(f"Error generating pre-feasibility questions for session {request.session_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating pre-feasibility questions: {str(e)}"
+        )
+
+
+# Endpoint 3: Feasibility Check
 @router.post("/feasibility")
 async def check_feasibility(request: FeasibilityRequest):
     """
@@ -216,23 +377,40 @@ async def check_feasibility(request: FeasibilityRequest):
         
         if request.use_intelligent_processing:
             print("Using Document Intelligence Pipeline for structured processing")
-            pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
-            pipeline_result = pipeline.process_documents(
-                session.document_paths,
-                output_dir="outputs/intermediate"
-            )
-            
-            # Store pipeline result in session for later use
-            session.pipeline_result = pipeline_result
-            print(f"Pipeline processed {len(pipeline_result.get('classifications', []))} documents")
-            
-            # Get structured planning context from pipeline
-            docs_text = pipeline.get_planning_context(pipeline_result)
-            print(f"Generated structured context: {len(docs_text)} characters")
+            # Check if we already have pipeline results
+            if session.pipeline_result:
+                print("Using cached Document Intelligence Pipeline results")
+                pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+                docs_text = pipeline.get_planning_context(session.pipeline_result)
+                print(f"Retrieved cached structured context: {len(docs_text)} characters")
+            else:
+                print("Running Document Intelligence Pipeline")
+                pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+                pipeline_result = pipeline.process_documents(
+                    session.document_paths,
+                    output_dir="outputs/intermediate"
+                )
+                session.pipeline_result = pipeline_result
+                docs_text = pipeline.get_planning_context(pipeline_result)
+                print(f"Generated structured context: {len(docs_text)} characters")
         else:
             print("Using raw text extraction")
             docs_text = extract_text_from_pdfs(session.document_paths)
             print(f"Extracted {len(docs_text)} characters from {len(session.document_paths)} documents")
+        
+        # Step 1.5: Add pre-feasibility questions to context if available
+        if session.pre_feasibility_questions:
+            print("Pre-feasibility questions found in session, adding to context")
+            questions_text = "\n\n## STRATEGIC FEASIBILITY QUESTIONS TO ADDRESS:\n\n"
+            for category, questions in session.pre_feasibility_questions.items():
+                questions_text += f"### {category}\n"
+                for i, q in enumerate(questions, 1):
+                    questions_text += f"{i}. {q}\n"
+                questions_text += "\n"
+            docs_text = docs_text + questions_text
+            print("Pre-feasibility questions added to context for guided assessment")
+        else:
+            print("No pre-feasibility questions found. Proceeding with standard assessment.")
         
         # Step 2: Generate feasibility assessment using LLM
         print("Step 2: Generating feasibility assessment with LLM")
@@ -381,36 +559,38 @@ async def generate_plan(request: GeneratePlanRequest):
             print("WARNING: No feasibility assessment found in session. Proceeding with document context only.")
             print("Consider running /feasibility endpoint first for better results.")
         
-        # Step 3: Initialize ReWOO state
-        print("Step 3: Initializing ReWOO state")
-        rewoo_state = ReWOO(
+        # Step 3: Initialize Reflection state
+        print(f"Step 3: Initializing Reflection state with max_iterations={request.max_iterations}")
+        reflection_state = ReflectionState(
+            task="Synthesize all provided project documents and feasibility notes into an executive-grade implementation plan.",
             document_context=document_context,
-            plan_string=None,
-            result=None,
-            feasibility_file_path=session.feasibility_file_path  # Pass the file path to state
+            feasibility_file_path=session.feasibility_file_path,
+            max_iterations=request.max_iterations,
         )
         
-        # Step 4: Execute the ReWOO graph with streaming (same as CLI)
-        print("Step 4: Executing ReWOO graph with streaming")
-        graph = get_graph(rewoo_state)
+        # Step 4: Execute the Reflection graph with streaming
+        print("Step 4: Executing Reflection graph with streaming")
+        graph = get_graph(reflection_state)
         
-        # Use .stream() like the CLI script does - this adds natural delays between nodes
-        # and prevents rapid-fire LLM calls that trigger rate limits
-        final_state = None
+        final_plan_text = None
+        iterations_count = 0
         node_count = 0
+        
         try:
-            for s in graph.stream(rewoo_state):
+            for s in graph.stream(reflection_state):
                 node_name = next(iter(s))
                 data = s[node_name]
                 node_count += 1
                 print(f"Completed node {node_count}: {node_name}")
                 
-                # Add a small delay between tool nodes to prevent rate limiting
-                # when there are many sequential tool executions
-                if node_name == "tool" and node_count > 5:
-                    time.sleep(0.5)  # 500ms delay after 5th tool to space out calls
+                # Capture the final plan when the revise node sets it
+                if node_name == "revise":
+                    final_plan_text = data.get("final_plan")
+                    iterations = data.get("iterations", [])
+                    iterations_count = len(iterations)
+                    if final_plan_text:
+                        print(f"Final plan captured from revise node after {iterations_count} iterations")
                 
-                final_state = s
         except Exception as e:
             error_msg = str(e)
             if "429" in error_msg or "Resource exhausted" in error_msg:
@@ -423,30 +603,27 @@ async def generate_plan(request: GeneratePlanRequest):
                 print(f"Error during graph execution: {error_msg}")
                 raise
         
-        if final_state is None:
+        if not final_plan_text:
+            print("ERROR: No final plan was captured during execution")
             raise HTTPException(
                 status_code=500,
-                detail="Failed to execute ReWOO graph - no final state returned"
+                detail="Failed to generate final plan. Please check that max_iterations allows enough cycles."
             )
         
         execution_time = time.time() - start_time
-        print(f"Plan generation completed in {execution_time:.2f}s")
+        print(f"Plan generation completed in {execution_time:.2f}s with {iterations_count} iterations")
         
-        # Extract information from final state (graph returns a dict)
-        steps = []
-        if final_state.get('steps'):
-            steps = [f"{step[0]} - {step[1]} = {step[2]}[{step[3]}]" for step in final_state.get('steps', [])]
+        result_str = final_plan_text
         
+        # Legacy response format for API compatibility
         plan_dict = {
-            "plan_string": final_state.get('plan_string', ""),
-            "steps": steps
+            "plan_string": f"Reflection-based plan generated in {iterations_count} iterations.",
+            "steps": []
         }
         
-        evidence_dict = final_state.get('results', {})
-        
-        result_str = final_state.get('result', "No result generated")
+        evidence_dict = {"iterations": iterations_count}
 
-        # Persist the final result to a markdown file for downstream consumption
+        # Persist the final result to a markdown file
         output_dir = Path("outputs")
         output_dir.mkdir(exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -466,8 +643,10 @@ async def generate_plan(request: GeneratePlanRequest):
             evidence=evidence_dict,
             result=result_str,
             file_path=str(plan_filepath) if plan_filepath else None,
-            steps=steps,
-            execution_time=execution_time
+            steps=[],
+            execution_time=execution_time,
+            iterations_completed=iterations_count,
+            status="completed"
         )
         
     except Exception as e:

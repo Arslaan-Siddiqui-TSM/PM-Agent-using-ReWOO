@@ -1,5 +1,7 @@
-from states.rewoo_state import ReWOO
-from utils.helper import get_current_task, truncate_query, get_global_logger
+raise RuntimeError(
+    "app.tool_executor has been removed. The reflection pattern no longer uses "
+    "step-based tool execution. Tools are now invoked directly within draft/reflect/revise nodes."
+)
 from tools.search_tool import search
 from config.llm_config import model
 import fitz

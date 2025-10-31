@@ -1,14 +1,4 @@
-from typing import List, Optional
-from pydantic import BaseModel, Field
-
-
-class ReWOO(BaseModel):
-    plan_string: Optional[str] = Field(None, description="The plan to achieve the task")
-    steps: List = Field(description="The steps to follow in the plan", default_factory=list)
-    results: dict = Field(description="The results of each step", default_factory=dict)
-    result: Optional[str] = Field(None, description="The final result of the task")
-    document_context: Optional[str] = Field(None, description="Intelligent document analysis context")
-    feasibility_file_path: Optional[str] = Field(None, description="Path to the feasibility assessment file")
-
-    def __getitem__(self, item):
-        return getattr(self, item)
+raise RuntimeError(
+    "states.rewoo_state.ReWOO has been removed. Import ReflectionState from "
+    "states.reflection_state instead."
+)
