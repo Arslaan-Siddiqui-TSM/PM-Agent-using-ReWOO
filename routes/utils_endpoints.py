@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import PlainTextResponse
 from pathlib import Path
 import os
 
@@ -40,6 +41,8 @@ async def get_session_info(session_id: str):
         "session_id": session.session_id,
         "created_at": session.created_at.isoformat(),
         "total_documents": len(session.document_paths),
+        "has_development_context": session.development_context is not None,
+        "development_context": session.development_context,
         "has_feasibility_assessment": session.feasibility_assessment is not None,
         "feasibility_file_path": session.feasibility_file_path,
         "has_pipeline_results": session.pipeline_result is not None,
@@ -84,3 +87,41 @@ async def delete_session(session_id: str):
     print(f"Session {session_id} deleted successfully")
     
     return {"message": f"Session {session_id} deleted successfully"}
+
+
+# Get file content
+@router.get("/file-content", response_class=PlainTextResponse)
+async def get_file_content(file_path: str = Query(..., description="Path to the file to read")):
+    """Read and return the content of a file (e.g., feasibility assessment or project plan)"""
+    try:
+        path = Path(file_path)
+        
+        # Security check: ensure the file is within allowed directories
+        allowed_dirs = [Path("outputs").resolve(), Path("uploads").resolve()]
+        file_resolved = path.resolve()
+        
+        if not any(file_resolved.is_relative_to(allowed_dir) for allowed_dir in allowed_dirs):
+            raise HTTPException(
+                status_code=403,
+                detail="Access to this file is not allowed"
+            )
+        
+        if not path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"File not found: {file_path}"
+            )
+        
+        # Read and return file content
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return content
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error reading file: {str(e)}"
+        )

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import "./App.css";
 
 const API_BASE = "http://localhost:8000/api";
@@ -24,16 +25,14 @@ function App() {
     constraints: "",
   });
 
-  // Step 3: AI-generated Pre-feasibility questions
-  const [questions, setQuestions] = useState(null);
-
-  // Step 4: Feasibility assessment
+  // Step 3: Feasibility assessment
   const [feasibilityReport, setFeasibilityReport] = useState("");
+  const [feasibilityFilePath, setFeasibilityFilePath] = useState("");
 
-  // Step 5: Feedback
+  // Step 4: Feedback
   const [feedback, setFeedback] = useState("");
 
-  // Step 6: Final plan
+  // Step 5: Final plan
   const [finalPlan, setFinalPlan] = useState("");
   const [planFilePath, setPlanFilePath] = useState("");
 
@@ -93,7 +92,7 @@ function App() {
     }
   };
 
-  // Handle static questions submission
+  // Handle static questions submission - go directly to feasibility check
   const handleStaticQuestionsSubmit = () => {
     // Validate that at least some fields are filled
     const hasAnswers = Object.values(devProcessAnswers).some(
@@ -105,36 +104,6 @@ function App() {
     }
     setError(null);
     setStep(3);
-  };
-
-  // Generate pre-feasibility questions
-  const handleGenerateQuestions = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`${API_BASE}/pre-feasibility-questions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          use_intelligent_processing: true,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to generate questions");
-      }
-
-      const data = await response.json();
-      setQuestions(data.questions);
-      setStep(4);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Check feasibility
@@ -165,17 +134,32 @@ function App() {
 
       // Fetch the feasibility report content
       if (data.file_path) {
-        const reportResponse = await fetch(`${API_BASE}/sessions/${sessionId}`);
-        if (reportResponse.ok) {
-          const sessionData = await reportResponse.json();
-          // For now, we'll just show a message. In production, you'd fetch the actual file
+        setFeasibilityFilePath(data.file_path);
+
+        // Read the actual file content
+        try {
+          const fileResponse = await fetch(
+            `${API_BASE}/file-content?file_path=${encodeURIComponent(
+              data.file_path
+            )}`
+          );
+          if (fileResponse.ok) {
+            const content = await fileResponse.text();
+            setFeasibilityReport(content);
+          } else {
+            setFeasibilityReport(
+              "Feasibility assessment generated successfully. Review the assessment before proceeding."
+            );
+          }
+        } catch (err) {
+          console.error("Error fetching file content:", err);
           setFeasibilityReport(
             "Feasibility assessment generated successfully. Review the assessment before proceeding."
           );
         }
       }
 
-      setStep(5);
+      setStep(4);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -207,7 +191,7 @@ function App() {
       const data = await response.json();
       setFinalPlan(data.result);
       setPlanFilePath(data.file_path);
-      setStep(6);
+      setStep(5);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -228,8 +212,8 @@ function App() {
       techStack: "",
       constraints: "",
     });
-    setQuestions(null);
     setFeasibilityReport("");
+    setFeasibilityFilePath("");
     setFeedback("");
     setFinalPlan("");
     setPlanFilePath("");
@@ -253,16 +237,13 @@ function App() {
           2. Process Info
         </div>
         <div className={`progress-step ${step >= 3 ? "active" : ""}`}>
-          3. AI Questions
+          3. Feasibility
         </div>
         <div className={`progress-step ${step >= 4 ? "active" : ""}`}>
-          4. Feasibility
+          4. Review
         </div>
         <div className={`progress-step ${step >= 5 ? "active" : ""}`}>
-          5. Review
-        </div>
-        <div className={`progress-step ${step >= 6 ? "active" : ""}`}>
-          6. Plan
+          5. Plan
         </div>
       </div>
 
@@ -472,57 +453,19 @@ function App() {
                 onClick={handleStaticQuestionsSubmit}
                 className="btn btn-primary"
               >
-                Continue to AI Questions
+                Continue to Feasibility Check
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3: AI-Generated Pre-Feasibility Questions */}
+        {/* Step 3: Feasibility Check */}
         {step === 3 && (
           <div className="step-container">
-            <h2>Step 3: Generate AI Feasibility Questions</h2>
+            <h2>Step 3: Generate Feasibility Assessment</h2>
             <p>
-              Generate strategic questions to assess project feasibility based
-              on your documents.
-            </p>
-
-            {!questions ? (
-              <button
-                onClick={handleGenerateQuestions}
-                disabled={loading}
-                className="btn btn-primary"
-              >
-                {loading ? "Generating Questions..." : "Generate AI Questions"}
-              </button>
-            ) : (
-              <div className="questions-container">
-                <h3>Strategic Feasibility Questions</h3>
-                {Object.entries(questions).map(([category, questionList]) => (
-                  <div key={category} className="question-category">
-                    <h4>{category}</h4>
-                    <ol>
-                      {questionList.map((q, idx) => (
-                        <li key={idx}>{q}</li>
-                      ))}
-                    </ol>
-                  </div>
-                ))}
-                <button onClick={() => setStep(4)} className="btn btn-primary">
-                  Continue to Feasibility Check
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Step 4: Feasibility Check */}
-        {step === 4 && (
-          <div className="step-container">
-            <h2>Step 4: Generate Feasibility Assessment</h2>
-            <p>
-              Analyze project feasibility based on uploaded documents,
-              development process info, and generated questions.
+              Analyze project feasibility based on uploaded documents and
+              development process information.
             </p>
 
             <button
@@ -535,19 +478,29 @@ function App() {
           </div>
         )}
 
-        {/* Step 5: Review Feasibility & Provide Feedback */}
-        {step === 5 && (
+        {/* Step 4: Review Feasibility & Provide Feedback */}
+        {step === 4 && (
           <div className="step-container">
-            <h2>Step 5: Review Feasibility Assessment</h2>
+            <h2>Step 4: Review Feasibility Assessment</h2>
 
             <div className="report-container">
               <div className="report-info">
                 <p>✅ Feasibility assessment has been generated and saved.</p>
-                <p>
-                  The assessment considers all uploaded documents and addresses
-                  the strategic questions.
-                </p>
+                {feasibilityFilePath && (
+                  <p className="file-path">
+                    Saved to: <code>{feasibilityFilePath}</code>
+                  </p>
+                )}
               </div>
+
+              {feasibilityReport && (
+                <div className="markdown-content">
+                  <h3>Feasibility Assessment Report</h3>
+                  <div className="markdown-wrapper">
+                    <ReactMarkdown>{feasibilityReport}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="feedback-section">
@@ -571,10 +524,10 @@ function App() {
           </div>
         )}
 
-        {/* Step 6: Final Project Plan */}
-        {step === 6 && (
+        {/* Step 5: Final Project Plan */}
+        {step === 5 && (
           <div className="step-container">
-            <h2>Step 6: Project Plan Generated ✨</h2>
+            <h2>Step 5: Project Plan Generated ✨</h2>
 
             <div className="success-message">
               <p>🎉 Your project plan has been successfully generated!</p>
@@ -586,9 +539,11 @@ function App() {
             </div>
 
             <div className="plan-preview">
-              <h3>Plan Preview</h3>
-              <div className="plan-content">
-                <pre>{finalPlan}</pre>
+              <h3>Project Plan</h3>
+              <div className="markdown-content">
+                <div className="markdown-wrapper">
+                  <ReactMarkdown>{finalPlan}</ReactMarkdown>
+                </div>
               </div>
             </div>
 

@@ -27,22 +27,10 @@ class UploadResponse(BaseModel):
     total_files: int
 
 
-class PreFeasibilityRequest(BaseModel):
-    session_id: str = Field(..., description="Session ID from upload response")
-    use_intelligent_processing: bool = Field(True, description="Use Document Intelligence Pipeline for processing")
-
-
-class PreFeasibilityResponse(BaseModel):
-    session_id: str
-    questions: Dict[str, List[str]]
-    message: str
-    execution_time: float
-    file_path: Optional[str] = Field(None, description="Path to the saved questions file")
-
-
 class FeasibilityRequest(BaseModel):
     session_id: str = Field(..., description="Session ID from upload response")
     use_intelligent_processing: bool = Field(True, description="Use Document Intelligence Pipeline for processing")
+    development_context: Optional[Dict[str, str]] = Field(None, description="Development process information from user (methodology, team size, timeline, etc.)")
 
 
 class GeneratePlanRequest(BaseModel):
@@ -196,152 +184,7 @@ async def upload_documents(
         )
 
 
-# Endpoint 2: Generate Pre-Feasibility Questions
-@router.post("/pre-feasibility-questions", response_model=PreFeasibilityResponse)
-async def generate_pre_feasibility_questions_endpoint(request: PreFeasibilityRequest):
-    """
-    Generate strategic questions to assess project feasibility before detailed analysis.
-    These questions help identify key concerns across multiple dimensions:
-    - Technical Feasibility
-    - Financial Viability
-    - Resource Availability
-    - Timeline Constraints
-    - Risk Factors
-    - Stakeholder Impact
-    
-    The generated questions will be used to guide the detailed feasibility assessment.
-    """
-    print(f"Pre-feasibility questions requested for session: {request.session_id}")
-    start_time = time.time()
-    
-    # Get session
-    session = sessions.get(request.session_id)
-    if not session:
-        print(f"Session not found: {request.session_id}")
-        raise HTTPException(
-            status_code=404,
-            detail="Session not found. Please upload documents first."
-        )
-    
-    if session.is_expired():
-        print(f"Session expired: {request.session_id}")
-        raise HTTPException(
-            status_code=410,
-            detail="Session expired. Please upload documents again."
-        )
-    
-    try:
-        # Import necessary functions
-        from app.feasibility_agent import extract_text_from_pdfs, generate_pre_feasibility_questions
-        
-        # Step 1: Process documents
-        print(f"Step 1: Processing documents (intelligent_processing={request.use_intelligent_processing})")
-        
-        if request.use_intelligent_processing:
-            print("Using Document Intelligence Pipeline for structured processing")
-            pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
-            pipeline_result = pipeline.process_documents(
-                session.document_paths,
-                output_dir="outputs/intermediate"
-            )
-            
-            # Store pipeline result in session for later use
-            session.pipeline_result = pipeline_result
-            print(f"Pipeline processed {len(pipeline_result.get('classifications', []))} documents")
-            
-            # Get structured context
-            docs_text = pipeline.get_planning_context(pipeline_result)
-            print(f"Generated structured context: {len(docs_text)} characters")
-        else:
-            print("Using raw text extraction")
-            docs_text = extract_text_from_pdfs(session.document_paths)
-            print(f"Extracted {len(docs_text)} characters from documents")
-        
-        # Step 2: Generate strategic questions using LLM
-        print("Step 2: Generating strategic feasibility questions with LLM")
-        
-        max_retries = 3
-        retry_delay = 5
-        questions_dict = None
-        
-        for attempt in range(max_retries):
-            try:
-                questions_dict = generate_pre_feasibility_questions(docs_text)
-                print("Pre-feasibility questions generated successfully")
-                break
-            except Exception as e:
-                error_msg = str(e)
-                if "429" in error_msg or "Resource exhausted" in error_msg:
-                    if attempt < max_retries - 1:
-                        wait_time = retry_delay * (2 ** attempt)
-                        print(f"Rate limit hit. Waiting {wait_time} seconds before retry {attempt + 1}/{max_retries}...")
-                        time.sleep(wait_time)
-                    else:
-                        print(f"Max retries reached. Rate limit still active.")
-                        raise HTTPException(
-                            status_code=429,
-                            detail=f"Google Gemini API rate limit exceeded. Please try again in a few minutes."
-                        )
-                else:
-                    raise
-        
-        if questions_dict is None:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to generate pre-feasibility questions"
-            )
-        
-        # Step 3: Save questions to file
-        print("Step 3: Saving pre-feasibility questions to file")
-        output_dir = Path("outputs")
-        output_dir.mkdir(exist_ok=True)
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"pre_feasibility_questions_{request.session_id[:8]}_{timestamp}.md"
-        file_path = output_dir / filename
-        
-        # Format questions as markdown
-        markdown_content = "# Pre-Feasibility Assessment Questions\n\n"
-        markdown_content += f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        markdown_content += f"Session ID: {request.session_id}\n\n"
-        markdown_content += "---\n\n"
-        
-        for category, questions in questions_dict.items():
-            markdown_content += f"## {category}\n\n"
-            for i, question in enumerate(questions, 1):
-                markdown_content += f"{i}. {question}\n"
-            markdown_content += "\n"
-        
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(markdown_content)
-        
-        print(f"Pre-feasibility questions saved to: {file_path}")
-        
-        # Step 4: Store in session
-        print("Step 4: Storing questions in session")
-        session.pre_feasibility_questions = questions_dict
-        session.pre_feasibility_file_path = str(file_path)
-        
-        execution_time = time.time() - start_time
-        print(f"Pre-feasibility questions generation completed in {execution_time:.2f}s")
-        
-        return PreFeasibilityResponse(
-            session_id=request.session_id,
-            questions=questions_dict,
-            message=f"Strategic feasibility questions generated successfully and saved to {filename}",
-            file_path=str(file_path),
-            execution_time=execution_time
-        )
-        
-    except Exception as e:
-        print(f"Error generating pre-feasibility questions for session {request.session_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error generating pre-feasibility questions: {str(e)}"
-        )
-
-
-# Endpoint 3: Feasibility Check
+# Endpoint 2: Feasibility Check
 @router.post("/feasibility")
 async def check_feasibility(request: FeasibilityRequest):
     """
@@ -377,19 +220,36 @@ async def check_feasibility(request: FeasibilityRequest):
         
         if request.use_intelligent_processing:
             print("Using Document Intelligence Pipeline for structured processing")
+            print(f"DOCUMENT PATHS: {session.document_paths}, SESSION PIPELINE RESULT: {session.pipeline_result}")
+            
+            # Initialize pipeline once
+            pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+            
             # Check if we already have pipeline results
             if session.pipeline_result:
                 print("Using cached Document Intelligence Pipeline results")
-                pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+                print(f"DEBUG: Pipeline result keys: {session.pipeline_result.keys()}")
+                print(f"DEBUG: Number of extractions: {len(session.pipeline_result.get('extractions', []))}")
+                print(f"DEBUG: Number of classifications: {len(session.pipeline_result.get('classifications', []))}")
+                
                 docs_text = pipeline.get_planning_context(session.pipeline_result)
                 print(f"Retrieved cached structured context: {len(docs_text)} characters")
             else:
                 print("Running Document Intelligence Pipeline")
-                pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+                print(f"DEBUG: Processing {len(session.document_paths)} documents:")
+                for i, path in enumerate(session.document_paths, 1):
+                    print(f"  {i}. {Path(path).name}")
+                
                 pipeline_result = pipeline.process_documents(
                     session.document_paths,
                     output_dir="outputs/intermediate"
                 )
+                
+                print(f"DEBUG: Pipeline completed successfully")
+                print(f"DEBUG: Pipeline result keys: {pipeline_result.keys()}")
+                print(f"DEBUG: Number of extractions: {len(pipeline_result.get('extractions', []))}")
+                print(f"DEBUG: Number of classifications: {len(pipeline_result.get('classifications', []))}")
+                
                 session.pipeline_result = pipeline_result
                 docs_text = pipeline.get_planning_context(pipeline_result)
                 print(f"Generated structured context: {len(docs_text)} characters")
@@ -398,22 +258,47 @@ async def check_feasibility(request: FeasibilityRequest):
             docs_text = extract_text_from_pdfs(session.document_paths)
             print(f"Extracted {len(docs_text)} characters from {len(session.document_paths)} documents")
         
-        # Step 1.5: Add pre-feasibility questions to context if available
-        if session.pre_feasibility_questions:
-            print("Pre-feasibility questions found in session, adding to context")
-            questions_text = "\n\n## STRATEGIC FEASIBILITY QUESTIONS TO ADDRESS:\n\n"
-            for category, questions in session.pre_feasibility_questions.items():
-                questions_text += f"### {category}\n"
-                for i, q in enumerate(questions, 1):
-                    questions_text += f"{i}. {q}\n"
-                questions_text += "\n"
-            docs_text = docs_text + questions_text
-            print("Pre-feasibility questions added to context for guided assessment")
+        # Step 1.5: Add development process information if provided
+        if request.development_context:
+            print("Development context provided, integrating into assessment")
+            print(f"DEBUG: Development context fields provided: {list(request.development_context.keys())}")
+            
+            dev_context_text = "\n\n## DEVELOPMENT PROCESS INFORMATION:\n\n"
+            dev_context_text += "The following information about the software development process has been provided:\n\n"
+            
+            context_labels = {
+                "methodology": "Development Methodology",
+                "teamSize": "Team Size",
+                "timeline": "Project Timeline",
+                "budget": "Budget Constraints",
+                "techStack": "Technology Stack",
+                "constraints": "Key Constraints or Risks"
+            }
+            
+            for key, value in request.development_context.items():
+                if value and value.strip():
+                    label = context_labels.get(key, key.replace("_", " ").title())
+                    dev_context_text += f"**{label}:** {value}\n\n"
+                    print(f"DEBUG:   - {label}: {value[:100]}{'...' if len(value) > 100 else ''}")
+            
+            docs_text = docs_text + dev_context_text
+            print(f"Development context added to assessment: {len(dev_context_text)} characters")
+            
+            # Store development context in session for later use
+            session.development_context = request.development_context
         else:
-            print("No pre-feasibility questions found. Proceeding with standard assessment.")
+            print("No development context provided. Proceeding without development process information.")
         
         # Step 2: Generate feasibility assessment using LLM
-        print("Step 2: Generating feasibility assessment with LLM")
+        print("Step 2: Generating feasibility assessment with LLM (including development context if provided)")
+        
+        # DEBUG: Show what context is being sent to the LLM
+        print("\n" + "="*80)
+        print("DEBUG: CONTEXT BEING SENT TO LLM FOR FEASIBILITY ASSESSMENT")
+        print("="*80)
+        print(f"Total context length: {len(docs_text)} characters")
+        print(f"Context preview:\n{docs_text}[:3000]...")
+        print("="*80 + "\n")
         
         max_retries = 3
         retry_delay = 5
@@ -520,19 +405,34 @@ async def generate_plan(request: GeneratePlanRequest):
         print(f"Step 1: Processing document context (intelligent_processing={request.use_intelligent_processing})")
         
         if request.use_intelligent_processing:
+            # Initialize pipeline once
+            pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+            
             # Check if we already have pipeline results from feasibility check
             if session.pipeline_result:
                 print("Using cached Document Intelligence Pipeline results from feasibility check")
-                pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+                print(f"DEBUG: Pipeline result keys: {session.pipeline_result.keys()}")
+                print(f"DEBUG: Number of extractions: {len(session.pipeline_result.get('extractions', []))}")
+                print(f"DEBUG: Number of classifications: {len(session.pipeline_result.get('classifications', []))}")
+                
                 document_context = pipeline.get_planning_context(session.pipeline_result)
                 print(f"Retrieved cached structured context: {len(document_context)} characters")
             else:
                 print("Running Document Intelligence Pipeline (no cached results)")
-                pipeline = DocumentIntelligencePipeline(enable_cache=True, verbose=False)
+                print(f"DEBUG: Processing {len(session.document_paths)} documents:")
+                for i, path in enumerate(session.document_paths, 1):
+                    print(f"  {i}. {Path(path).name}")
+                
                 pipeline_result = pipeline.process_documents(
                     session.document_paths,
                     output_dir="outputs/intermediate"
                 )
+                
+                print(f"DEBUG: Pipeline completed successfully")
+                print(f"DEBUG: Pipeline result keys: {pipeline_result.keys()}")
+                print(f"DEBUG: Number of extractions: {len(pipeline_result.get('extractions', []))}")
+                print(f"DEBUG: Number of classifications: {len(pipeline_result.get('classifications', []))}")
+                
                 session.pipeline_result = pipeline_result
                 document_context = pipeline.get_planning_context(pipeline_result)
                 print(f"Generated structured context: {len(document_context)} characters")
@@ -561,6 +461,29 @@ async def generate_plan(request: GeneratePlanRequest):
         
         # Step 3: Initialize Reflection state
         print(f"Step 3: Initializing Reflection state with max_iterations={request.max_iterations}")
+        
+        # DEBUG: Show what context is being sent to the LLM for plan generation
+        print("\n" + "="*80)
+        print("DEBUG: CONTEXT BEING SENT TO LLM FOR PROJECT PLAN GENERATION")
+        print("="*80)
+        print(f"Total document context length: {len(document_context)} characters")
+        print(f"Has feasibility assessment: {session.feasibility_assessment is not None}")
+        print(f"Feasibility file path: {session.feasibility_file_path}")
+        print(f"\nDocument context structure:")
+        # Show section headers to understand structure
+        lines = document_context.split('\n')
+        section_headers = [line for line in lines if line.startswith('#')]
+        print(f"Found {len(section_headers)} section headers:")
+        for header in section_headers[:20]:  # Show first 20 headers
+            print(f"  {header}")
+        if len(section_headers) > 20:
+            print(f"  ... and {len(section_headers) - 20} more sections")
+        
+        print(f"\nContext preview (first 3000 chars):\n{document_context[:3000]}")
+        print("..." if len(document_context) > 3000 else "")
+        print(f"\nContext preview (last 1500 chars):\n...{document_context[-1500:]}")
+        print("="*80 + "\n")
+        
         reflection_state = ReflectionState(
             task="Synthesize all provided project documents and feasibility notes into an executive-grade implementation plan.",
             document_context=document_context,

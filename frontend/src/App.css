@@ -443,6 +443,182 @@
   margin-right: 1rem;
 }
 
+/* Markdown Content Styling */
+.markdown-content {
+  margin: 2rem 0;
+}
+
+.markdown-content h3 {
+  color: #667eea;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.markdown-wrapper {
+  max-height: 600px;
+  overflow-y: auto;
+  background: #f9f9f9;
+  padding: 2rem;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  line-height: 1.7;
+}
+
+.markdown-wrapper h1 {
+  color: #333;
+  font-size: 2rem;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #667eea;
+}
+
+.markdown-wrapper h2 {
+  color: #444;
+  font-size: 1.6rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.markdown-wrapper h3 {
+  color: #555;
+  font-size: 1.3rem;
+  margin-top: 1.2rem;
+  margin-bottom: 0.6rem;
+}
+
+.markdown-wrapper h4 {
+  color: #666;
+  font-size: 1.1rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-wrapper p {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+.markdown-wrapper ul,
+.markdown-wrapper ol {
+  margin-left: 2rem;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.markdown-wrapper li {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.markdown-wrapper code {
+  background: #f0f0f0;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: "Courier New", monospace;
+  font-size: 0.9em;
+  color: #d63384;
+}
+
+.markdown-wrapper pre {
+  background: #2d2d2d;
+  color: #f8f8f2;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.markdown-wrapper pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-wrapper blockquote {
+  border-left: 4px solid #667eea;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #555;
+  font-style: italic;
+  background: #f9f9ff;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.markdown-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.markdown-wrapper table th {
+  background: #667eea;
+  color: white;
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.markdown-wrapper table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.markdown-wrapper table tr:nth-child(even) {
+  background: #f9f9f9;
+}
+
+.markdown-wrapper a {
+  color: #667eea;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s ease;
+}
+
+.markdown-wrapper a:hover {
+  border-bottom-color: #667eea;
+}
+
+.markdown-wrapper hr {
+  border: none;
+  border-top: 2px solid #ddd;
+  margin: 2rem 0;
+}
+
+.markdown-wrapper strong {
+  color: #333;
+  font-weight: 700;
+}
+
+.markdown-wrapper em {
+  font-style: italic;
+  color: #555;
+}
+
+/* Scrollbar styling for markdown content */
+.markdown-wrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.markdown-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.markdown-wrapper::-webkit-scrollbar-thumb {
+  background: #667eea;
+  border-radius: 4px;
+}
+
+.markdown-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #764ba2;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .header h1 {
@@ -473,5 +649,22 @@
 
   .btn {
     width: 100%;
+  }
+
+  .markdown-wrapper {
+    padding: 1rem;
+    font-size: 0.95rem;
+  }
+
+  .markdown-wrapper h1 {
+    font-size: 1.6rem;
+  }
+
+  .markdown-wrapper h2 {
+    font-size: 1.3rem;
+  }
+
+  .markdown-wrapper h3 {
+    font-size: 1.1rem;
   }
 }
