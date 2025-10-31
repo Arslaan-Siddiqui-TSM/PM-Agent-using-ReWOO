@@ -60,6 +60,7 @@ class DocumentClassifierAgent:
         "api_documentation",
         "business_requirements",
         "design_document",
+        "SoW (Statement of Work)",
         "unknown"
     ]
     

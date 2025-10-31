@@ -1,32 +1,46 @@
+from __future__ import annotations
+
+from typing import Literal
+
 from langgraph.graph import END, StateGraph, START
-from states.rewoo_state import ReWOO
-from app.plan import get_plan
-from app.tool_executor import tool_execution
-from app.solver import solve
-from utils.helper import route
+
+from app.draft import generate_draft
+from app.reflect import generate_reflection
+from app.revise import apply_revision
+from states.reflection_state import ReflectionState
 
 
-def get_graph(state: ReWOO):
-    """
-    Initializes the ReWOO agent graph for planning.
-    Assumes feasibility questions have been answered in a single markdown file.
-    """
+def _route_after_revision(state: ReflectionState) -> Literal["draft", "finalize"]:
+    if state.final_plan is not None:
+        return "finalize"
+    return "draft"
+
+
+def _finalize_node(state: ReflectionState) -> dict:
+    if state.final_plan is None and state.current_draft is not None:
+        # Safeguard: if we reach finalize without explicitly setting final_plan,
+        # return the latest draft as the final result.
+        return {"final_plan": state.current_draft}
+    return {}
+
+
+def get_graph(state: ReflectionState):
+    """Build the reflection-style reasoning graph."""
+
     if not state:
         return None
 
-    graph = StateGraph(ReWOO)
+    graph = StateGraph(ReflectionState)
 
-    # Planning node
-    graph.add_node("plan", get_plan)
-    # Tool execution node
-    graph.add_node("tool", tool_execution)
-    # Solver node
-    graph.add_node("solve", solve)
+    graph.add_node("draft", generate_draft)
+    graph.add_node("reflect", generate_reflection)
+    graph.add_node("revise", apply_revision)
+    graph.add_node("finalize", _finalize_node)
 
-    # Graph edges
-    graph.add_edge(START, "plan")
-    graph.add_edge("plan", "tool")
-    graph.add_conditional_edges("tool", route)
-    graph.add_edge("solve", END)
+    graph.add_edge(START, "draft")
+    graph.add_edge("draft", "reflect")
+    graph.add_edge("reflect", "revise")
+    graph.add_conditional_edges("revise", _route_after_revision)
+    graph.add_edge("finalize", END)
 
     return graph.compile()

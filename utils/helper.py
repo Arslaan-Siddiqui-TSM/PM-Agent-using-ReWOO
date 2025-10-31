@@ -1,5 +1,4 @@
 import os
-from states.rewoo_state import ReWOO
 from datetime import datetime
 from typing import Optional
 
@@ -32,7 +31,7 @@ class MarkdownLogger:
     def start(self, task: str, pdf_files: list, feasibility_file: str):
         """Log the start of agent execution."""
         self.start_time = datetime.now()
-        self.logs.append("# ReWOO Agent Execution Log\n")
+        self.logs.append("# Reflection Agent Execution Log\n")
         self.logs.append(f"**Execution Date:** {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         self.logs.append("---\n\n")
         self.logs.append("## Configuration\n\n")
@@ -42,6 +41,7 @@ class MarkdownLogger:
             self.logs.append(f"- {os.path.basename(pdf_file)}\n")
         self.logs.append(f"\n**Feasibility Context:** `{feasibility_file}`\n\n")
         self.logs.append("---\n\n")
+    
     def log_llm_interaction(self, stage: str, prompt: str, response: str, additional_context: Optional[dict] = None):
         """Log complete LLM prompt and response.
         
@@ -71,54 +71,71 @@ class MarkdownLogger:
         self.logs.append("\n```\n\n")
         self.logs.append("---\n\n")
     
-    def log_planning_stage(self, plan_string: str, steps: list):
-        """Log the planning stage output."""
-        self.logs.append("## 🧩 Planning Stage Summary\n\n")
-        self.logs.append("### Generated Plan\n\n")
-        self.logs.append("```\n")
-        self.logs.append(plan_string)
-        self.logs.append("\n```\n\n")
-        
-        if steps:
-            self.logs.append("### Parsed Plan Steps\n\n")
-            self.logs.append("| Step | Evidence ID | Tool | Input |\n")
-            self.logs.append("|------|-------------|------|-------|\n")
-            for idx, (plan_text, step_name, tool, tool_input) in enumerate(steps, 1):
-                # Escape pipe characters in table cells
-                input_escaped = tool_input.strip().replace("|", "\\|")
-                self.logs.append(f"| {idx} | {step_name} | {tool} | {input_escaped} |\n")
+    def log_iteration_draft(
+        self,
+        iteration_index: int,
+        draft_text: str,
+        revision_focus: Optional[str] = None,
+        context_source: Optional[str] = None,
+    ):
+        """Log the drafted plan for the given iteration."""
+
+        self.logs.append(f"## � Iteration {iteration_index}: Draft\n\n")
+        if context_source or revision_focus:
+            self.logs.append("### Context\n\n")
+            if context_source:
+                self.logs.append(f"- **Context Source:** {context_source}\n")
+            if revision_focus:
+                self.logs.append(f"- **Revision Focus:** {revision_focus}\n")
             self.logs.append("\n")
-        
-        self.logs.append("---\n\n")
-    
-    def log_tool_execution(self, results: dict):
-        """Log the tool execution results summary."""
-        self.logs.append("## 🔧 Tool Execution Summary\n\n")
-        
-        if results:
-            for k, v in results.items():
-                self.logs.append(f"### Result of {k}\n\n")
-                self.logs.append("```\n")
-                result_text = str(v)
-                # Truncate very long results for summary section
-                if len(result_text) > 2000:
-                    result_text = result_text[:2000] + "\n... [truncated - see LLM interaction details above for full content] ..."
-                self.logs.append(result_text)
-                self.logs.append("\n```\n\n")
-        else:
-            self.logs.append("*No results yet.*\n\n")
-        
-        self.logs.append("---\n\n")
-    
-    def log_final_solution(self, result: str):
-        """Log the final solution summary."""
-        self.logs.append("## 🧠 Final Solution Summary\n\n")
+
+        self.logs.append("### Draft Plan\n\n")
         self.logs.append("```\n")
-        result_text = str(result).strip()
-        # Truncate if very long for summary
-        if len(result_text) > 3000:
-            result_text = result_text[:3000] + "\n... [truncated - see Solver LLM interaction above for full content] ..."
-        self.logs.append(result_text)
+        self.logs.append(draft_text)
+        self.logs.append("\n```\n\n")
+        self.logs.append("---\n\n")
+
+    def log_iteration_critique(self, iteration_index: int, critique_text: str):
+        """Log the critique produced for the current draft."""
+
+        self.logs.append(f"## 🔍 Iteration {iteration_index}: Critique\n\n")
+        self.logs.append("```\n")
+        self.logs.append(critique_text)
+        self.logs.append("\n```\n\n")
+        self.logs.append("---\n\n")
+
+    def log_revision_decision(
+        self,
+        iteration_index: int,
+        decision: str,
+        rationale: Optional[str],
+        required_actions: Optional[str],
+    ):
+        """Log the outcome of the revise step."""
+
+        self.logs.append(f"## ♻️ Iteration {iteration_index}: Revision Decision\n\n")
+        self.logs.append(f"- **Decision:** {decision}\n")
+        if rationale:
+            self.logs.append(f"- **Rationale:** {rationale}\n")
+        if required_actions:
+            self.logs.append("- **Required Actions:**\n")
+            for line in required_actions.splitlines():
+                cleaned = line.strip()
+                if cleaned:
+                    self.logs.append(f"  - {cleaned}\n")
+        if not required_actions:
+            self.logs.append("- **Required Actions:** None\n")
+        self.logs.append("\n---\n\n")
+
+    def log_final_plan(self, plan: str):
+        """Log the final accepted plan."""
+
+        self.logs.append("## ✅ Final Project Plan\n\n")
+        self.logs.append("```\n")
+        plan_text = plan.strip()
+        if len(plan_text) > 4000:
+            plan_text = plan_text[:4000] + "\n... [truncated - see iteration logs for full content] ..."
+        self.logs.append(plan_text)
         self.logs.append("\n```\n\n")
         self.logs.append("---\n\n")
     
@@ -160,40 +177,6 @@ def load_prompt_template(path: str) -> str:
         return f.read()
 
 
-def get_current_task(state: ReWOO):
-    """Get the current task number for the given state.
-
-    Args:
-        state (ReWOO): The current state of the ReWOO agent.
-
-    Returns:
-        int | None: The current task number, or None if all tasks are completed.
-    """
-    if not hasattr(state, "results") or state.results is None:
-        return 1
-    if state.steps is not None and len(state.results) == len(state.steps):
-        return None
-    else:
-        return len(state.results) + 1
-
-
-def route(state):
-    """Determine the next node to route to based on the current task state.
-
-    Args:
-        state (ReWOO): The current state of the ReWOO agent.
-
-    Returns:
-        str: The name of the next node to route to ("solve" or "tool").
-    """
-    _step = get_current_task(state)
-    if _step is None:
-        # We have executed all tasks
-        return "solve"
-    else:
-        # We are still executing tasks, loop back to the "tool" node
-        return "tool"
-    
 def truncate_query(query: str, max_length: int = 400) -> str:
     """Truncate a search query to fit within the maximum length while preserving meaning."""
     if len(query) <= max_length:
@@ -276,4 +259,5 @@ def load_all_documents_from_directory(directory_path: str) -> str:
             all_content.append(f"=== Document: {filename} ===\n[Error reading file: {str(e)}]\n")
     
     return "\n\n".join(all_content)
+
 

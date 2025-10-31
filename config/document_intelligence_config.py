@@ -43,7 +43,8 @@ ANALYSIS_CONFIG = {
         "technical_specification",
         "requirements_document",
         "test_plan",
-        "use_case"
+        "use_case",
+        "sow"
     ],
     
     # Critical information categories
