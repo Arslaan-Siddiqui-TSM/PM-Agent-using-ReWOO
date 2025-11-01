@@ -1,0 +1,25 @@
+# core
+streamlit
+langchain
+langchain_openai
+langchain-community
+langchain_classic
+langchain-core
+openai
+chromadb
+langchain_chroma
+
+# file loaders & utilities
+python-multipart
+pypdf
+python-docx
+python-pptx
+pandas
+tqdm
+
+# optional (if using image OCR)
+pytesseract
+Pillow
+
+# dev
+python-dotenv
