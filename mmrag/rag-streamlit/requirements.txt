@@ -11,6 +11,7 @@ langchain_chroma
 
 # file loaders & utilities
 python-multipart
+docx2txt
 pypdf
 python-docx
 python-pptx

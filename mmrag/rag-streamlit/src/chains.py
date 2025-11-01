@@ -2,6 +2,7 @@ from langchain_classic.chains import RetrievalQA
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.documents import Document
+# represent chunks of documents before embedding or retrieval
 from typing import Any
 from .config import settings
 import logging

@@ -26,8 +26,12 @@ with st.sidebar:
     chunk_overlap = st.number_input("Chunk overlap", min_value=0, max_value=1000, value=settings.CHUNK_OVERLAP)
     reindex = st.button("Clear & reindex collection")
 
-# file uploader
-uploaded_files = st.file_uploader("Upload files (PDF, TXT, DOCX)", accept_multiple_files=True, type=["pdf","txt","md","docx","pptx"])
+#  Expanded accepted file types
+uploaded_files = st.file_uploader(
+    "Upload files (PDF, TXT, DOCX, CSV, XLS, XLSX)",
+    accept_multiple_files=True,
+    type=["pdf", "txt", "md", "docx", "csv", "xls", "xlsx"]
+)
 
 if "store" not in st.session_state:
     st.session_state.store = None
@@ -42,7 +46,7 @@ if reindex:
     else:
         st.info("No collection in session to clear.")
 
-# ingest
+#  Ingestion Process
 if uploaded_files:
     st.info(f"Saving {len(uploaded_files)} uploads to a temp dir and ingesting...")
     tmpdir = Path(tempfile.mkdtemp())
@@ -52,26 +56,31 @@ if uploaded_files:
         with open(save_path, "wb") as out:
             out.write(f.getbuffer())
         saved_paths.append(str(save_path))
-    # load & chunk
+
     try:
-        raw_docs = load_documents(saved_paths)
+        raw_docs = load_documents(saved_paths)  # <-- supports CSV & Excel now
         cfg = IngestConfig(max_chunk_size=int(max_chunk_size), chunk_overlap=int(chunk_overlap))
         split_docs = chunk_documents(raw_docs, cfg)
-        # initialize chroma
+
+        # Initialize vector store
         store = ChromaStore(persist_directory=persist_dir, collection_name=collection_name)
-        # add ids for traceability
+
+        # Assign unique IDs for traceability
         ids = [str(uuid.uuid4()) for _ in split_docs]
         store.add_documents(split_docs, ids=ids)
+
         st.success(f"Ingested {len(split_docs)} chunks into Chroma collection '{collection_name}'.")
         st.session_state.store = store
+
     except Exception as e:
         st.exception(f"Ingestion failed: {e}")
 
-# Chat interface
+# 💬 Chat Interface
 st.markdown("---")
 st.subheader("Ask a question")
 query = st.text_input("Enter your question", "")
 k = st.slider("Retriever results (k)", min_value=1, max_value=10, value=4)
+
 if st.button("Ask") and query.strip():
     if not st.session_state.get("store"):
         st.error("No documents indexed yet. Upload documents first.")
@@ -80,15 +89,18 @@ if st.button("Ask") and query.strip():
             retriever = st.session_state.store.as_retriever({"k": k})
             qa = make_qa_chain(retriever)
             result = qa({"query": query})
-            answer = result["result"] if "result" in result else result.get("answer")
+            answer = result.get("result") or result.get("answer")
+
             st.write("**Answer:**")
             st.write(answer)
-            # show source documents
+
+            # Source documents
             src_docs = result.get("source_documents", [])
             if src_docs:
                 st.write("**Source documents (top results):**")
                 for i, d in enumerate(src_docs[:k]):
-                    st.write(f"---\n**Source {i+1} metadata:** {d.metadata if hasattr(d,'metadata') else {}}")
+                    st.write(f"---\n**Source {i+1} metadata:** {d.metadata if hasattr(d, 'metadata') else {}}")
                     st.write(d.page_content[:1000] + ("..." if len(d.page_content) > 1000 else ""))
+
         except Exception as e:
             st.exception(f"Query failed: {e}")
