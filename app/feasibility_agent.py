@@ -49,76 +49,174 @@ def extract_text_from_pdfs(file_paths: list[str]) -> str:
     return all_text.strip()
 
 
-def generate_feasibility_questions(document_text: str) -> str:
+def generate_feasibility_questions(document_text: str, development_context: dict = None, session_id: str = "unknown") -> dict:
     """Generate feasibility questions for the Tech Lead review.
 
     Args:
         document_text (str): The text content of the document.
+        development_context (dict, optional): Development process information from user.
+        session_id (str, optional): Session ID for the assessment.
 
     Returns:
-        str: The generated feasibility assessment in markdown format.
+        dict: Dictionary with keys 'thinking_summary' and 'feasibility_report' containing markdown text.
     """    
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Starting feasibility question generation")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Input document text length: {len(document_text)} characters")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Development context provided: {development_context is not None}")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Session ID: {session_id}")
     
-    prompt_path = os.path.join(os.path.dirname(__file__), "..", "prompts", "feasibility_prompt.txt")
+    prompt_path = os.path.join(os.path.dirname(__file__), "..", "prompts", "feasibility_promptv2.txt")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading prompt from: {prompt_path}")
     
     with open(prompt_path, "r", encoding="utf-8") as f:
-        feasibility_prompt = f.read()
+        system_prompt = f.read()
     
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Prompt template loaded, length: {len(feasibility_prompt)} characters")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] System prompt loaded, length: {len(system_prompt)} characters")
     
-    # # Limit document text to avoid token limits
-    # truncated_text = document_text[:8000]
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Truncating document text to {len(document_text)} characters")
+    # Truncate document text if too long (keep reasonable limit for token budget)
+    max_doc_length = 25000
+    if len(document_text) > max_doc_length:
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Truncating document text to {max_doc_length} characters")
+        document_text = document_text[:max_doc_length]
     
-    feasibility_prompt = feasibility_prompt.format(document_text=document_text)
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Final prompt length: {len(feasibility_prompt)} characters")
+    # Prepare the user payload as per the prompt's INPUT CONTRACT
+    import json
+    
+    # If development_context is None, provide an empty dict with "unknown" placeholder
+    if development_context is None:
+        development_context = {
+            "note": "No development context provided by user",
+            "team_size": "unknown",
+            "timeline": "unknown",
+            "budget": "unknown",
+            "methodology": "unknown"
+        }
+    
+    user_payload = {
+        "development_context": development_context,
+        "documents_summary": {
+            "session_id": session_id,
+            "content": document_text,
+            "source": "project documents"
+        }
+    }
+    
+    # Build the full prompt with system instructions + JSON payload
+    user_message = json.dumps(user_payload, ensure_ascii=False, indent=2)
+    
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] User payload length: {len(user_message)} characters")
+    
+    # Combine system prompt and user message
+    full_prompt = f"{system_prompt}\n\n---\n\nUSER PAYLOAD:\n\n{user_message}"
+    
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Full prompt length: {len(full_prompt)} characters")
     
     # Show a preview of the prompt
     console.print("\n[bold magenta]DEBUG - PROMPT PREVIEW:[/bold magenta]")
     console.print("[dim]" + "="*80 + "[/dim]")
-    console.print(f"[cyan]Number of character in prompt: {len(feasibility_prompt)}[/cyan]")
+    console.print(f"[cyan]Total prompt characters: {len(full_prompt)}[/cyan]")
+    console.print(f"[cyan]User payload preview:[/cyan]")
+    console.print(user_message[:500] + "..." if len(user_message) > 500 else user_message)
     console.print("[dim]" + "="*80 + "[/dim]\n")
     
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Invoking LLM model...")
     
     try:
-        result = model.invoke(feasibility_prompt)
+        result = model.invoke(full_prompt)
         console.print(f"[bold green]DEBUG:[/bold green] LLM invocation successful")
         console.print(f"[bold yellow]DEBUG:[/bold yellow] Result type: {type(result)}")
     except Exception as e:
         console.print(f"[bold red]DEBUG ERROR:[/bold red] LLM invocation failed: {e}")
-        return f"Error calling LLM: {e}"
+        return {
+            "thinking_summary": f"Error calling LLM: {e}",
+            "feasibility_report": f"Error calling LLM: {e}"
+        }
 
-    # Normalize result to a string so callers (like save_questions_to_markdown) always receive str
+    # Normalize result to a string
     content = getattr(result, "content", result)
+    content_str = str(content)
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Content type: {type(content)}")
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Content length: {len(str(content))} characters")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Content length: {len(content_str)} characters")
     
     # Show a preview of the LLM response
     console.print("\n[bold magenta]DEBUG - LLM RESPONSE PREVIEW:[/bold magenta]")
     console.print("[dim]" + "="*80 + "[/dim]")
-    content_str = str(content)
     response_preview = content_str[:800] + "\n\n... [truncated] ...\n\n" + content_str[-300:] if len(content_str) > 1100 else content_str
     console.print(f"[green]{response_preview}[/green]")
     console.print("[dim]" + "="*80 + "[/dim]\n")
 
-    if isinstance(content, str):
-        console.print(f"[bold green]DEBUG:[/bold green] Returning string content")
-        return content
+    # Parse the delimited response to extract both markdown documents
+    thinking_summary = ""
+    feasibility_report = ""
 
-    # If it's a list or dict or other object, convert to a readable JSON or fallback to str()
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Converting non-string content to JSON")
-    try:
-        import json
-        json_result = json.dumps(content, ensure_ascii=False, indent=2)
-        console.print(f"[bold green]DEBUG:[/bold green] JSON conversion successful")
-        return json_result
-    except Exception:
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] JSON conversion failed, using str()")
-        return str(content)
+    # Optional: strip surrounding code fences if present
+    cs_strip = content_str.strip()
+    if cs_strip.startswith("```") and cs_strip.endswith("```"):
+        console.print("[bold yellow]DEBUG:[/bold yellow] Stripping surrounding code fences from response")
+        # remove only one outer layer of fences
+        cs_body = cs_strip[3:]
+        # drop optional language tag until first newline
+        nl = cs_body.find("\n")
+        if nl != -1:
+            cs_body = cs_body[nl+1:]
+        cs_body = cs_body.rstrip("`")
+        content_str = cs_body.strip()
+
+    # Try robust regex-based extraction (handles missing END markers)
+    import re as _re
+    think_pat = _re.compile(
+        r"---THINKING_SUMMARY_START---\s*(.*?)\s*(?:---THINKING_SUMMARY_END---|---FEASIBILITY_REPORT_START---|\Z)",
+        _re.DOTALL,
+    )
+    report_pat = _re.compile(
+        r"---FEASIBILITY_REPORT_START---\s*(.*?)\s*(?:---FEASIBILITY_REPORT_END---|\Z)",
+        _re.DOTALL,
+    )
+
+    m_think = think_pat.search(content_str)
+    if m_think:
+        thinking_summary = m_think.group(1).strip()
+        console.print(f"[bold green]DEBUG:[/bold green] Extracted thinking summary via regex (len={len(thinking_summary)})")
+
+    m_report = report_pat.search(content_str)
+    if m_report:
+        feasibility_report = m_report.group(1).strip()
+        console.print(f"[bold green]DEBUG:[/bold green] Extracted feasibility report via regex (len={len(feasibility_report)})")
+    
+    # Fallback: try JSON parsing if delimiters not found
+    if not thinking_summary or not feasibility_report:
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Delimiters not found, trying JSON parsing...")
+        try:
+            parsed_json = json.loads(content_str)
+            if isinstance(parsed_json, dict):
+                thinking_summary = parsed_json.get("thinking_summary.md", thinking_summary)
+                feasibility_report = parsed_json.get("feasibility_report.md", feasibility_report)
+                if thinking_summary or feasibility_report:
+                    console.print(f"[bold green]DEBUG:[/bold green] Successfully parsed JSON response")
+        except json.JSONDecodeError:
+            console.print(f"[bold yellow]DEBUG:[/bold yellow] Not valid JSON, using content as-is")
+    
+    # Partial fallback heuristics if only one section present
+    if thinking_summary and not feasibility_report:
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Feasibility report missing; leaving empty to trigger retry")
+        feasibility_report = ""
+    elif feasibility_report and not thinking_summary:
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Thinking summary missing; generating minimal placeholder")
+        thinking_summary = "# Thinking Summary\n\n(Generated from unstructured response. Retry may improve extraction.)"
+
+    # Final fallback: if both still empty, dump entire content as feasibility report
+    if not feasibility_report and not thinking_summary:
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] No sections parsed; using entire response as feasibility report")
+        feasibility_report = content_str
+        thinking_summary = "# Thinking Summary\n\n(Generated from unstructured response)"
+    
+    console.print(f"[bold green]DEBUG:[/bold green] Extracted thinking summary: {len(thinking_summary)} chars")
+    console.print(f"[bold green]DEBUG:[/bold green] Extracted feasibility report: {len(feasibility_report)} chars")
+    
+    return {
+        "thinking_summary": thinking_summary,
+        "feasibility_report": feasibility_report
+    }
 
 
 def save_questions_to_markdown(questions_md: str, file_name: str, output_dir="outputs"):
@@ -152,15 +250,25 @@ def save_questions_to_markdown(questions_md: str, file_name: str, output_dir="ou
     return output_path
 
 
-def run_feasibility_agent(file_paths: list[str]) -> str:
-    """Run the feasibility agent on multiple documents, producing a single markdown file."""
+def run_feasibility_agent(file_paths: list[str], development_context: dict = None, session_id: str = "standalone") -> tuple[str, str]:
+    """Run the feasibility agent on multiple documents, producing two markdown files.
+    
+    Args:
+        file_paths: List of paths to PDF files
+        development_context: Optional development process information
+        session_id: Session ID for tracking
+        
+    Returns:
+        tuple: (thinking_summary_path, feasibility_report_path) - Paths to the saved markdown files
+    """
     console.print(f"[bold yellow]DEBUG:[/bold yellow] === Starting Feasibility Agent ===")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Received {len(file_paths)} file paths")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Session ID: {session_id}")
     
     if not file_paths:
         console.print(Panel("No files provided for feasibility analysis.", border_style="yellow"))
         console.print(f"[bold red]DEBUG:[/bold red] Exiting early - no files provided")
-        return ""
+        return ("", "")
 
     for i, fp in enumerate(file_paths, 1):
         console.print(f"[bold yellow]DEBUG:[/bold yellow] File {i}: {fp}")
@@ -175,23 +283,93 @@ def run_feasibility_agent(file_paths: list[str]) -> str:
     console.print(Panel(f"Extracted [bold]{len(docs_text)}[/bold] characters from all documents.", border_style="cyan"))
 
     # Generate assessment once for all documents combined
-    console.print(Panel("Generating feasibility questions...", border_style="magenta"))
+    console.print(Panel("Generating feasibility analysis...", border_style="magenta"))
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Calling generate_feasibility_questions...")
-    questions_md = generate_feasibility_questions(docs_text)
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Question generation complete")
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Generated content length: {len(questions_md)} characters")
+    result = generate_feasibility_questions(
+        document_text=docs_text,
+        development_context=development_context,
+        session_id=session_id
+    )
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Analysis generation complete")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Thinking summary length: {len(result['thinking_summary'])} characters")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Feasibility report length: {len(result['feasibility_report'])} characters")
 
-    # Save into a single file
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Calling save_questions_to_markdown...")
-    output_path = save_questions_to_markdown(questions_md, "feasibility_assessment.md")
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] File save complete")
-    console.print(Panel(f"Feasibility file saved to: [bold]{output_path}[/bold]", border_style="green"))
+    # Save both files
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Saving markdown files...")
+    
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Save thinking summary
+    thinking_path = save_questions_to_markdown(
+        result["thinking_summary"], 
+        f"thinking_summary_{session_id[:8]}_{timestamp}.md"
+    )
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Thinking summary saved")
+    
+    # Save feasibility report
+    report_path = save_questions_to_markdown(
+        result["feasibility_report"], 
+        f"feasibility_report_{session_id[:8]}_{timestamp}.md"
+    )
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Feasibility report saved")
+    
+    console.print(Panel(
+        f"Feasibility files saved:\n- Thinking Summary: [bold]{thinking_path}[/bold]\n- Feasibility Report: [bold]{report_path}[/bold]", 
+        border_style="green"
+    ))
 
-    console.print(Panel(Text("Feasibility stage complete. Please review and fill in answers before proceeding.",
+    console.print(Panel(Text("Feasibility stage complete. Please review the reports before proceeding.",
                              justify="center"), border_style="green"))
     console.print(f"[bold yellow]DEBUG:[/bold yellow] === Feasibility Agent Complete ===")
-    return output_path
+    return (thinking_path, report_path)
 
+
+def save_development_context_to_json(
+    development_context: dict,
+    session_id: str,
+    output_dir: str = "outputs/intermediate"
+) -> str:
+    """Save development context data to a JSON file.
+    
+    Args:
+        development_context (dict): Dictionary containing form data from frontend
+            (methodology, teamSize, timeline, budget, techStack, constraints).
+        session_id (str): Session ID associated with this context.
+        output_dir (str, optional): Directory to save the JSON file. 
+            Defaults to "outputs/intermediate".
+    
+    Returns:
+        str: The path to the saved JSON file.
+    """
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Saving development context to JSON")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Session ID: {session_id}")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Output directory: {output_dir}")
+    
+    import json
+    from datetime import datetime
+    
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Create filename with session ID and timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_filename = f"development_context_{session_id[:8]}_{timestamp}.json"
+    json_file_path = os.path.join(output_dir, json_filename)
+    
+    # Prepare the JSON data structure
+    json_data = {
+        "session_id": session_id,
+        "timestamp": datetime.now().isoformat(),
+        "development_context": development_context,
+    }
+    
+    # Save to JSON file
+    with open(json_file_path, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, indent=2, ensure_ascii=False)
+    
+    console.print(f"[bold green]DEBUG:[/bold green] Development context saved to: {json_file_path}")
+    return json_file_path
 
 
 if __name__ == "__main__":

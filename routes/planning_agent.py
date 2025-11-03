@@ -213,7 +213,7 @@ async def check_feasibility(request: FeasibilityRequest):
     
     try:
         # Import the feasibility functions
-        from app.feasibility_agent import extract_text_from_pdfs, generate_feasibility_questions
+        from app.feasibility_agent import extract_text_from_pdfs, generate_feasibility_questions, save_development_context_to_json
         
         # Step 1: Process documents with Document Intelligence Pipeline or raw extraction
         print(f"Step 1: Processing documents (intelligent_processing={request.use_intelligent_processing})")
@@ -263,6 +263,15 @@ async def check_feasibility(request: FeasibilityRequest):
             print("Development context provided, integrating into assessment")
             print(f"DEBUG: Development context fields provided: {list(request.development_context.keys())}")
             
+            # Step 1.5a: Save development context to JSON file
+            print("Step 1.5a: Saving development context to JSON file")
+            dev_context_json_path = save_development_context_to_json(
+                development_context=request.development_context,
+                session_id=request.session_id,
+                output_dir="outputs/intermediate"
+            )
+            print(f"Development context saved to JSON: {dev_context_json_path}")
+            
             dev_context_text = "\n\n## DEVELOPMENT PROCESS INFORMATION:\n\n"
             dev_context_text += "The following information about the software development process has been provided:\n\n"
             
@@ -286,6 +295,7 @@ async def check_feasibility(request: FeasibilityRequest):
             
             # Store development context in session for later use
             session.development_context = request.development_context
+            session.development_context_json_path = dev_context_json_path
         else:
             print("No development context provided. Proceeding without development process information.")
         
@@ -296,8 +306,10 @@ async def check_feasibility(request: FeasibilityRequest):
         print("\n" + "="*80)
         print("DEBUG: CONTEXT BEING SENT TO LLM FOR FEASIBILITY ASSESSMENT")
         print("="*80)
-        print(f"Total context length: {len(docs_text)} characters")
-        print(f"Context preview:\n{docs_text}[:3000]...")
+        print(f"Total document context length: {len(docs_text)} characters")
+        print(f"Development context provided: {request.development_context is not None}")
+        if request.development_context:
+            print(f"Development context keys: {list(request.development_context.keys())}")
         print("="*80 + "\n")
         
         max_retries = 3
@@ -306,7 +318,13 @@ async def check_feasibility(request: FeasibilityRequest):
         
         for attempt in range(max_retries):
             try:
-                feasibility_assessment = generate_feasibility_questions(docs_text)
+                # Pass development_context and session_id to the function
+                # Returns dict with 'thinking_summary' and 'feasibility_report' keys
+                feasibility_result = generate_feasibility_questions(
+                    document_text=docs_text,
+                    development_context=request.development_context,
+                    session_id=request.session_id
+                )
                 print("Feasibility assessment generated")
                 break
             except Exception as e:
@@ -326,40 +344,81 @@ async def check_feasibility(request: FeasibilityRequest):
                     # Not a rate limit error, re-raise immediately
                     raise
         
-        if feasibility_assessment is None:
+        if feasibility_result is None:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to generate feasibility assessment"
             )
+
+        # Guard: if outputs are empty or too short, try one more regeneration and then bail with error
+        def _too_short(s: str) -> bool:
+            return (not s) or (len(s.strip()) < 50)
+
+        if _too_short(feasibility_result.get("feasibility_report", "")) or _too_short(feasibility_result.get("thinking_summary", "")):
+            print("WARNING: Feasibility outputs too short; attempting one retry generation...")
+            try:
+                feasibility_result_retry = generate_feasibility_questions(
+                    document_text=docs_text,
+                    development_context=request.development_context,
+                    session_id=request.session_id
+                )
+                if feasibility_result_retry and not (_too_short(feasibility_result_retry.get("feasibility_report", "")) or _too_short(feasibility_result_retry.get("thinking_summary", ""))):
+                    feasibility_result = feasibility_result_retry
+                    print("Retry succeeded with non-empty outputs")
+                else:
+                    print("Retry still produced empty/insufficient content; aborting without writing files")
+                    raise HTTPException(
+                        status_code=502,
+                        detail="LLM returned insufficient content for feasibility outputs. Please try again."
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"Retry generation failed: {e}")
+                raise HTTPException(
+                    status_code=502,
+                    detail="LLM invocation failed to produce usable content."
+                )
         
-        # Step 3: Save feasibility assessment to file
-        print("Step 3: Saving feasibility assessment to file")
+        # Step 3: Save both markdown files
+        print("Step 3: Saving feasibility documents to files")
         output_dir = Path("outputs")
         output_dir.mkdir(exist_ok=True)
         
         # Create filename with session ID and timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"feasibility_assessment_{request.session_id[:8]}_{timestamp}.md"
-        file_path = output_dir / filename
         
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(feasibility_assessment)
+        # Save thinking summary
+        thinking_filename = f"thinking_summary_{request.session_id[:8]}_{timestamp}.md"
+        thinking_path = output_dir / thinking_filename
+        with open(thinking_path, "w", encoding="utf-8") as f:
+            f.write(feasibility_result["thinking_summary"])
+        print(f"Thinking summary saved to: {thinking_path}")
         
-        print(f"Feasibility assessment saved to: {file_path}")
+        # Save feasibility report
+        report_filename = f"feasibility_report_{request.session_id[:8]}_{timestamp}.md"
+        report_path = output_dir / report_filename
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(feasibility_result["feasibility_report"])
+        print(f"Feasibility report saved to: {report_path}")
         
-        # Step 4: Store feasibility assessment in session
+        # Step 4: Store in session (store the main report)
         print("Step 4: Storing feasibility assessment in session")
-        session.feasibility_assessment = feasibility_assessment
-        session.feasibility_file_path = str(file_path)  # Store the file path
-        print(f"Feasibility assessment stored in session with file path: {file_path}")
+        session.feasibility_assessment = feasibility_result["feasibility_report"]
+        session.feasibility_file_path = str(report_path)
+        session.thinking_summary = feasibility_result["thinking_summary"]
+        session.thinking_summary_file_path = str(thinking_path)
+        print(f"Feasibility documents stored in session")
         
         execution_time = time.time() - start_time
         print(f"Feasibility check completed in {execution_time:.2f}s")
         
         return {
             "session_id": request.session_id,
-            "message": f"Feasibility assessment generated successfully and saved to {filename}",
-            "file_path": str(file_path),
+            "message": f"Feasibility assessment generated successfully. Two files created: {thinking_filename} and {report_filename}",
+            "thinking_summary_file": str(thinking_path),
+            "feasibility_report_file": str(report_path),
+            "development_context_json_path": getattr(session, 'development_context_json_path', None),
             "execution_time": execution_time
         }
         

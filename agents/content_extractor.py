@@ -12,7 +12,10 @@ except ImportError:
 
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict, field
+from pathlib import Path
+from string import Template
 import json
+import re
 
 from config.llm_config import model
 from langchain_core.messages import HumanMessage
@@ -60,10 +63,48 @@ class ContentExtractorAgent:
     
     # Maximum characters to send to LLM for extraction
     MAX_DOCUMENT_LENGTH = 20000
+    PROMPT_FILENAME = "content_extraction_prompt.txt"
     
     def __init__(self, llm=None):
         """Initialize the extractor with an LLM model."""
         self.llm = llm or model
+        self._prompt_cache: Optional[str] = None
+    
+    def _prompt_path(self) -> Path:
+        """Get path to external prompt template."""
+        # agents/ -> project root -> prompts/content_extraction_prompt.txt
+        return Path(__file__).resolve().parents[1] / "prompts" / self.PROMPT_FILENAME
+    
+    def _load_prompt_template(self) -> str:
+        """Load and cache the external prompt template; fallback to minimal inline prompt if missing."""
+        if self._prompt_cache is not None:
+            return self._prompt_cache
+        
+        path = self._prompt_path()
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                self._prompt_cache = f.read()
+        except Exception:
+            # Minimal fallback to avoid hard failures
+            self._prompt_cache = (
+                "SYSTEM\nYou are a document analysis assistant.\n\n"
+                "DOCUMENT TYPE: $document_type\nFILENAME: $filename\n\n"
+                "TEXT\n$document_text\n\n"
+                "Output only valid JSON with fields: "
+                "title, summary, key_sections, requirements, features, technical_details, "
+                "test_cases, use_cases, risks, assumptions, dependencies, constraints, "
+                "technologies, stakeholders, systems, keywords, extraction_confidence, extraction_notes."
+            )
+        return self._prompt_cache
+    
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text to reduce token usage while preserving meaning."""
+        # Collapse multiple spaces/tabs to single space
+        text = re.sub(r"[ \t]+", " ", text)
+        # Limit runs of newlines to max 2
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        # Strip leading/trailing whitespace
+        return text.strip()
     
     def extract_full_text(self, pdf_path: str) -> str:
         """Extract full text from PDF, truncated if too long."""
@@ -86,7 +127,10 @@ class ContentExtractorAgent:
                     text_parts.append(page_text)
                     total_chars += len(page_text)
                 
-                return "\n\n".join(text_parts)
+                    full_text = "\n\n".join(text_parts)
+                    # Normalize text to reduce token usage
+                    normalized = self._normalize_text(full_text)
+                    return normalized if normalized else None
                 
         except Exception as e:
             return f"[Error extracting text: {str(e)}]"
@@ -134,154 +178,13 @@ class ContentExtractorAgent:
     ) -> str:
         """Build type-specific extraction prompt."""
         
-        # Common instructions for all types
-        base_instructions = f"""You are a document analysis expert. Extract structured information from the following document.
-
-**Document Type:** {document_type}
-**Filename:** {filename} (for reference only)
-
-Your task is to extract and structure the key information from this document in JSON format.
-"""
-        
-        # Type-specific extraction instructions
-        type_specific_instructions = self._get_type_specific_instructions(document_type)
-        
-        # JSON schema
-        json_schema = """{
-    "title": "Document title or main heading",
-    "summary": "Brief 2-3 sentence summary of the document",
-    "key_sections": [
-        {"title": "Section name", "content": "Brief summary of section content"}
-    ],
-    "requirements": [
-        {"id": "REQ-001", "description": "Requirement description", "priority": "high/medium/low", "type": "functional/non-functional"}
-    ],
-    "features": [
-        {"name": "Feature name", "description": "Feature description", "priority": "high/medium/low"}
-    ],
-    "technical_details": {
-        "architecture": "Brief architecture description",
-        "technology_stack": ["tech1", "tech2"],
-        "integrations": ["integration1", "integration2"],
-        "data_model": "Brief data model description"
-    },
-    "test_cases": [
-        {"id": "TC-001", "title": "Test case title", "description": "Test description", "type": "unit/integration/e2e"}
-    ],
-    "use_cases": [
-        {"id": "UC-001", "title": "Use case title", "actors": ["actor1"], "description": "Brief description"}
-    ],
-    "risks": ["Risk 1", "Risk 2"],
-    "assumptions": ["Assumption 1", "Assumption 2"],
-    "dependencies": ["Dependency 1", "Dependency 2"],
-    "constraints": ["Constraint 1", "Constraint 2"],
-    "technologies": ["Technology 1", "Technology 2"],
-    "stakeholders": ["Stakeholder 1", "Stakeholder 2"],
-    "systems": ["System 1", "System 2"],
-    "keywords": ["keyword1", "keyword2"],
-    "extraction_confidence": 0.9,
-    "extraction_notes": ["Note about extraction quality or missing information"]
-}"""
-        
-        full_prompt = f"""{base_instructions}
-
-{type_specific_instructions}
-
-**Document Content:**
-```
-{document_text}
-```
-
-**Expected JSON Output Format:**
-{json_schema}
-
-**Important Guidelines:**
-1. Extract ONLY information that is explicitly present in the document
-2. Use empty arrays [] for sections with no relevant information
-3. Be thorough but concise in descriptions
-4. For requirements, try to identify IDs if present in the document
-5. Set extraction_confidence based on document clarity (0.0 to 1.0)
-6. Add extraction_notes if information is ambiguous or missing
-7. Include all mentioned technologies, systems, and stakeholders
-8. Extract key risks, assumptions, dependencies, and constraints
-
-Provide ONLY the JSON response, no additional text.
-"""
-        
-        return full_prompt
-    
-    def _get_type_specific_instructions(self, document_type: str) -> str:
-        """Get extraction instructions specific to document type."""
-        
-        instructions = {
-            "functional_specification": """
-**Focus Areas for Functional Specification:**
-- Extract all features and user stories
-- Identify business rules and workflows
-- Capture user requirements and acceptance criteria
-- Note any UI/UX specifications
-- Extract functional requirements with priorities
-""",
-            "technical_specification": """
-**Focus Areas for Technical Specification:**
-- Extract architecture and system design details
-- Identify all technologies, frameworks, and libraries
-- Capture API specifications and data models
-- Note integration points with external systems
-- Extract technical requirements and constraints
-- Identify security and performance specifications
-""",
-            "requirements_document": """
-**Focus Areas for Requirements Document:**
-- Extract all functional and non-functional requirements
-- Identify requirement IDs, priorities, and categories
-- Capture acceptance criteria for each requirement
-- Note any requirement dependencies
-- Extract performance, security, scalability requirements
-""",
-            "test_plan": """
-**Focus Areas for Test Plan:**
-- Extract test strategies and approaches
-- Identify test cases with IDs and descriptions
-- Capture test types (unit, integration, e2e, UAT)
-- Note testing tools and frameworks
-- Extract quality metrics and acceptance criteria
-""",
-            "use_case": """
-**Focus Areas for Use Case Document:**
-- Extract all use cases with IDs and titles
-- Identify actors and their roles
-- Capture preconditions and postconditions
-- Note main flow and alternative flows
-- Extract business scenarios
-""",
-            "architecture_document": """
-**Focus Areas for Architecture Document:**
-- Extract system architecture and design patterns
-- Identify components and their relationships
-- Capture deployment architecture
-- Note scalability and reliability considerations
-- Extract technology decisions and rationale
-""",
-            "security_document": """
-**Focus Areas for Security Document:**
-- Extract security requirements and controls
-- Identify authentication and authorization mechanisms
-- Capture compliance requirements
-- Note threat models and risk assessments
-- Extract security best practices
-""",
-            "unknown": """
-**Focus Areas for Unknown Document Type:**
-- Extract any structured information found
-- Identify the apparent purpose of the document
-- Capture any requirements, features, or technical details
-- Note key topics and themes
-- Extract any mentioned stakeholders, systems, or technologies
-"""
-        }
-        
-        return instructions.get(document_type, instructions["unknown"])
+        # Load external prompt template and substitute placeholders
+        template = Template(self._load_prompt_template())
+        return template.safe_substitute(
+            document_type=document_type,
+            filename=filename,
+            document_text=document_text
+        )
     
     def _parse_extraction_response(
         self,
