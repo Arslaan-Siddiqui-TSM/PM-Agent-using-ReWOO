@@ -38,6 +38,7 @@ langchain==0.3.27
 langchain-community==0.3.31
 langchain-core==0.3.79
 langchain-google-genai==2.1.12
+openai>=1.52.0
 langchain-tavily==0.2.12
 langchain-text-splitters==0.3.11
 langgraph==0.6.10

@@ -28,6 +28,8 @@ function App() {
   // Step 3: Feasibility assessment
   const [feasibilityReport, setFeasibilityReport] = useState("");
   const [feasibilityFilePath, setFeasibilityFilePath] = useState("");
+  const [developmentContextJsonPath, setDevelopmentContextJsonPath] =
+    useState("");
 
   // Step 4: Feedback
   const [feedback, setFeedback] = useState("");
@@ -93,8 +95,11 @@ function App() {
   };
 
   // Handle static questions submission - go directly to feasibility check
-  const handleStaticQuestionsSubmit = () => {
+  const handleStaticQuestionsSubmit = (event) => {
     // Validate that at least some fields are filled
+    event.preventDefault();
+    const formData = Object.fromEntries(new FormData(event.target));
+    console.log("Static questions submitted", formData);
     const hasAnswers = Object.values(devProcessAnswers).some(
       (val) => val.trim() !== ""
     );
@@ -132,10 +137,16 @@ function App() {
 
       const data = await response.json();
 
-      // Fetch the feasibility report content
+      // Store file paths
       if (data.file_path) {
         setFeasibilityFilePath(data.file_path);
+      }
+      if (data.development_context_json_path) {
+        setDevelopmentContextJsonPath(data.development_context_json_path);
+      }
 
+      // Fetch the feasibility report content
+      if (data.file_path) {
         // Read the actual file content
         try {
           const fileResponse = await fetch(
@@ -214,6 +225,7 @@ function App() {
     });
     setFeasibilityReport("");
     setFeasibilityFilePath("");
+    setDevelopmentContextJsonPath("");
     setFeedback("");
     setFinalPlan("");
     setPlanFilePath("");
@@ -318,144 +330,149 @@ function App() {
               will help in assessing project feasibility.
             </p>
 
-            <div className="static-questions-form">
-              <div className="form-group">
-                <label htmlFor="methodology">
-                  Development Methodology{" "}
-                  <span className="optional">
-                    (e.g., Agile, Waterfall, Scrum)
-                  </span>
-                </label>
-                <input
-                  id="methodology"
-                  type="text"
-                  value={devProcessAnswers.methodology}
-                  onChange={(e) =>
-                    setDevProcessAnswers({
-                      ...devProcessAnswers,
-                      methodology: e.target.value,
-                    })
-                  }
-                  placeholder="What development methodology will you use?"
-                  className="form-input"
-                />
-              </div>
+            <form onSubmit={handleStaticQuestionsSubmit}>
+              <div className="static-questions-form">
+                <div className="form-group">
+                  <label htmlFor="methodology">
+                    Development Methodology{" "}
+                    <span className="optional">
+                      (e.g., Agile, Waterfall, Scrum)
+                    </span>
+                  </label>
+                  <input
+                    id="methodology"
+                    type="text"
+                    name="methodology"
+                    value={devProcessAnswers.methodology}
+                    onChange={(e) =>
+                      setDevProcessAnswers({
+                        ...devProcessAnswers,
+                        methodology: e.target.value,
+                      })
+                    }
+                    placeholder="What development methodology will you use?"
+                    className="form-input"
+                  />
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="teamSize">
-                  Team Size{" "}
-                  <span className="optional">
-                    (Number of developers, designers, testers, etc.)
-                  </span>
-                </label>
-                <input
-                  id="teamSize"
-                  type="text"
-                  value={devProcessAnswers.teamSize}
-                  onChange={(e) =>
-                    setDevProcessAnswers({
-                      ...devProcessAnswers,
-                      teamSize: e.target.value,
-                    })
-                  }
-                  placeholder="How many people will be on the team?"
-                  className="form-input"
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="teamSize">
+                    Team Size{" "}
+                    <span className="optional">
+                      (Number of developers, designers, testers, etc.)
+                    </span>
+                  </label>
+                  <input
+                    id="teamSize"
+                    type="text"
+                    name="teamSize"
+                    value={devProcessAnswers.teamSize}
+                    onChange={(e) =>
+                      setDevProcessAnswers({
+                        ...devProcessAnswers,
+                        teamSize: e.target.value,
+                      })
+                    }
+                    placeholder="How many people will be on the team?"
+                    className="form-input"
+                  />
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="timeline">
-                  Project Timeline{" "}
-                  <span className="optional">(Expected duration)</span>
-                </label>
-                <input
-                  id="timeline"
-                  type="text"
-                  value={devProcessAnswers.timeline}
-                  onChange={(e) =>
-                    setDevProcessAnswers({
-                      ...devProcessAnswers,
-                      timeline: e.target.value,
-                    })
-                  }
-                  placeholder="What is the expected project duration?"
-                  className="form-input"
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="timeline">
+                    Project Timeline{" "}
+                    <span className="optional">(Expected duration)</span>
+                  </label>
+                  <input
+                    id="timeline"
+                    type="text"
+                    name="timeline"
+                    value={devProcessAnswers.timeline}
+                    onChange={(e) =>
+                      setDevProcessAnswers({
+                        ...devProcessAnswers,
+                        timeline: e.target.value,
+                      })
+                    }
+                    placeholder="What is the expected project duration?"
+                    className="form-input"
+                  />
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="budget">
-                  Budget Constraints{" "}
-                  <span className="optional">
-                    (Approximate budget or constraints)
-                  </span>
-                </label>
-                <input
-                  id="budget"
-                  type="text"
-                  value={devProcessAnswers.budget}
-                  onChange={(e) =>
-                    setDevProcessAnswers({
-                      ...devProcessAnswers,
-                      budget: e.target.value,
-                    })
-                  }
-                  placeholder="What is the estimated budget or budget constraints?"
-                  className="form-input"
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="budget">
+                    Budget Constraints{" "}
+                    <span className="optional">
+                      (Approximate budget or constraints)
+                    </span>
+                  </label>
+                  <input
+                    id="budget"
+                    type="text"
+                    name="budget"
+                    value={devProcessAnswers.budget}
+                    onChange={(e) =>
+                      setDevProcessAnswers({
+                        ...devProcessAnswers,
+                        budget: e.target.value,
+                      })
+                    }
+                    placeholder="What is the estimated budget or budget constraints?"
+                    className="form-input"
+                  />
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="techStack">
-                  Technology Stack{" "}
-                  <span className="optional">
-                    (Languages, frameworks, databases)
-                  </span>
-                </label>
-                <textarea
-                  id="techStack"
-                  value={devProcessAnswers.techStack}
-                  onChange={(e) =>
-                    setDevProcessAnswers({
-                      ...devProcessAnswers,
-                      techStack: e.target.value,
-                    })
-                  }
-                  placeholder="What technologies, languages, and frameworks will be used?"
-                  className="form-textarea"
-                  rows={3}
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="techStack">
+                    Technology Stack{" "}
+                    <span className="optional">
+                      (Languages, frameworks, databases)
+                    </span>
+                  </label>
+                  <textarea
+                    id="techStack"
+                    name="techStack"
+                    value={devProcessAnswers.techStack}
+                    onChange={(e) =>
+                      setDevProcessAnswers({
+                        ...devProcessAnswers,
+                        techStack: e.target.value,
+                      })
+                    }
+                    placeholder="What technologies, languages, and frameworks will be used?"
+                    className="form-textarea"
+                    rows={3}
+                  />
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="constraints">
-                  Key Constraints or Risks{" "}
-                  <span className="optional">
-                    (Technical, business, or resource constraints)
-                  </span>
-                </label>
-                <textarea
-                  id="constraints"
-                  value={devProcessAnswers.constraints}
-                  onChange={(e) =>
-                    setDevProcessAnswers({
-                      ...devProcessAnswers,
-                      constraints: e.target.value,
-                    })
-                  }
-                  placeholder="Are there any known constraints or risks to the project?"
-                  className="form-textarea"
-                  rows={3}
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="constraints">
+                    Key Constraints or Risks{" "}
+                    <span className="optional">
+                      (Technical, business, or resource constraints)
+                    </span>
+                  </label>
+                  <textarea
+                    id="constraints"
+                    name="constraints"
+                    value={devProcessAnswers.constraints}
+                    onChange={(e) =>
+                      setDevProcessAnswers({
+                        ...devProcessAnswers,
+                        constraints: e.target.value,
+                      })
+                    }
+                    placeholder="Are there any known constraints or risks to the project?"
+                    className="form-textarea"
+                    rows={3}
+                  />
+                </div>
 
-              <button
-                onClick={handleStaticQuestionsSubmit}
-                className="btn btn-primary"
-              >
-                Continue to Feasibility Check
-              </button>
-            </div>
+                <button type="submit" className="btn btn-primary">
+                  Continue to Feasibility Check
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
@@ -488,7 +505,13 @@ function App() {
                 <p>✅ Feasibility assessment has been generated and saved.</p>
                 {feasibilityFilePath && (
                   <p className="file-path">
-                    Saved to: <code>{feasibilityFilePath}</code>
+                    Feasibility Report: <code>{feasibilityFilePath}</code>
+                  </p>
+                )}
+                {developmentContextJsonPath && (
+                  <p className="file-path">
+                    Development Context JSON:{" "}
+                    <code>{developmentContextJsonPath}</code>
                   </p>
                 )}
               </div>
