@@ -1,685 +1,128 @@
-# ReWOO Demonstration Project
+# Project Planning Assistant (ReWOO demo)
 
-An end-to-end implementation of the ReWOO (Reasoning WithOut Observation) paradigm using LangGraph, designed to turn multiple project documents (BRDs, specs, test plans, etc.) into a comprehensive project plan. This repo adds a Document Intelligence Pipeline that classifies, extracts, and analyzes PDFs to produce a clean planning context before ReWOO planning and execution.
+Turn multiple project PDFs (specs, BRDs, test plans) into a feasibility assessment and a polished project plan. Backend is FastAPI; frontend is React (Vite). Documents are parsed, classified, and analyzed; embeddings go to Qdrant for retrieval; the plan is generated via an LLM workflow.
 
-## 🆕 New Professional Structure
+Quick, simple, and local-friendly.
 
-**The codebase has been restructured following industry best practices!**
+## What’s inside
 
-- ✅ **Organized source code** in `src/` directory
-- ✅ **Categorized documentation** in `docs/` with subdirectories
-- ✅ **Consolidated data files** in `data/` directory
-- ✅ **Organized scripts** in `scripts/` directory
-- ✅ **Cleaned root directory** for professional appearance
+- FastAPI backend (http://localhost:8000)
+- React/Vite frontend (http://localhost:5173)
+- Document Intelligence Pipeline (classify → extract → analyze)
+- Qdrant vector DB (Docker) for embeddings and retrieval
 
-**📖 See full details**: [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) | **📝 Summary**: [`RESTRUCTURING_SUMMARY.md`](RESTRUCTURING_SUMMARY.md)
+## Prerequisites
 
----
+- Python 3.13+
+- Node.js 18+ (for the frontend)
+- Docker (for Qdrant)
+- API keys:
+  - OpenAI: required for embeddings (text-embedding-3-\*)
+  - Google Gemini or OpenAI: for the LLM (choose via env)
 
-## 📋 Table of Contents
+Note: Even if you use Gemini for the LLM, OpenAI API key is still needed for embeddings unless you modify code to use a different embedding provider.
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Project Flow](#project-flow)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
-  - [Using UV (Recommended)](#using-uv-recommended)
-  - [Using pip](#using-pip)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [How It Works](#how-it-works)
-- [Components Deep Dive](#components-deep-dive)
-- [Output Format](#output-format)
-- [Testing](#testing)
-- [Known quirks](#known-quirks)
-- [Dependencies](#dependencies)
-- [Contributing](#contributing)
-- [License](#license)
+## Setup (Windows cmd)
 
----
+1. Clone and create your environment file
 
-## 🎯 Overview
-
-This project implements the ReWOO (Reasoning WithOut Observation) framework, which is an advanced reasoning pattern that separates planning from execution. It's designed to analyze multiple project documents and automatically generate structured, comprehensive project plans in Markdown.
-
-This implementation uses:
-
-- LangGraph for orchestrating the reasoning workflow
-- Google Gemini 2.0 Flash for language model operations
-- PyMuPDF for PDF document processing
-- Tavily Search for web-based information retrieval
-- A custom Document Intelligence Pipeline for classification, extraction, cross-doc analysis, and caching
-
----
-
-## 🏗️ Architecture
-
-The system combines a pre-processing intelligence pipeline with a state-driven ReWOO graph powered by LangGraph:
-
-```
-              ┌──────────────────────────────────────────┐
-              │     Document Intelligence Pipeline       │
-              │  • Classification (LLM + caching)        │
-              │  • Content extraction (LLM + PyMuPDF)    │
-              │  • Cross-doc analysis (gaps/conflicts)   │
-              │  • Planning context generation           │
-              └──────────────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────┐
-│                    ReWOO State                          │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │ • task: str                                       │  │
-│  │ • plan_string: str                                │  │
-│  │ • steps: List[tuple]                              │  │
-│  │ • results: dict                                   │  │
-│  │ • result: str                                     │  │
-│  │ • document_context: str (from pipeline)           │  │
-│  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              LangGraph Workflow                         │
-│                                                          │
-│  START → PLAN → TOOL → (route) → TOOL (loop) → SOLVE   │
-│                   ↓                  ↓            ↓     │
-│                Execute            Check if      Final   │
-│                Tools              Complete      Result  │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
+```cmd
+copy .env.example .env
 ```
 
-### Core Components
-
-#### Why ReWOO over ReAct for this use case
-
-For multi-document planning (BRDs, specs, test plans) the plan-first nature of ReWOO is a better fit than ReAct’s stepwise observe-replan loop:
-
-- Fewer LLM calls and lower latency: We plan once, then execute deterministically. ReAct re-prompts at every step, repeatedly re-ingesting context.
-- Better use of Document Intelligence: The pipeline creates a compact planning context consumed once. ReAct would re-derive/merge context many times, increasing cost and drift.
-- Evidence reuse and consistency: ReWOO’s evidence IDs (#E1, #E2, …) let later steps reference prior results without recomputation, keeping outputs consistent across documents.
-- Reproducibility and caching: A fixed plan enables effective caching of classification/extraction/analysis and stable, auditable runs with a full Markdown execution log.
-
-1. States (`states/rewoo_state.py`): Pydantic model defining the agent's state
-2. Planner (`app/plan.py`): Generates multi-step reasoning plans (uses pipeline context if available)
-3. Tool Executor (`app/tool_executor.py`): Executes tools (LLM, FileReader, Google Search)
-4. Solver (`app/solver.py`): Synthesizes results into final output
-5. Graph (`app/graph.py`): Orchestrates the workflow using LangGraph
-6. Document Intelligence (`core/*`, `agents/*`): Smart pre-processing for planning
-7. Main (`main.py`): Entry point with rich console output and Markdown execution log
-
----
-
-## 🔄 Project Flow
-
-### 0. Document Intelligence Stage (Recommended) 🧠
-
-```
-Input: All PDFs in files/ directory
-      ↓
-Classifier → Extractor → Analyzer → Planning Context
-      ↓
-Output: Clean, consolidated planning context string
-        + Intermediate JSON/MD artifacts under outputs/intermediate/
-```
-
-### 1. Planning Stage 🧩
-
-```
-Input: Task description (+ feasibility notes + document context)
-         ↓
-   Planner reads planner_prompt.txt
-         ↓
-   LLM generates structured plan with steps
-         ↓
-   Output: Plan string + parsed steps
-```
-
-If the intelligence pipeline ran, the planner uses the generated context instead of raw PDFs.
-
-Example Plan:
-
-```
-Plan: Read the BRD document to extract raw text
-#E1 = FileReader['files/Functional Specification Document.pdf']
-
-Plan: Identify key project epics from the BRD
-#E2 = LLM[Extract high-level modules from #E1]
-
-Plan: Generate user stories for each epic
-#E3 = LLM[Break down #E2 into user stories]
-...
-```
-
-### 2. Tool Execution Stage 🔧
-
-```
-For each step in the plan:
-    ├── Get current task number
-    ├── Parse step (tool, input, dependencies)
-    ├── Resolve dependencies (#E1, #E2, etc.)
-    ├── Execute tool:
-    │   ├── FileReader: Extract PDF text
-    │   ├── LLM: Process and analyze
-    │   └── Google: Web search (max 400 chars)
-    └── Store result with evidence ID
-```
-
-Conditional Routing:
-
-- If more steps remain → Loop back to TOOL node
-- If all steps complete → Route to SOLVE node
-
-### 3. Solving Stage 🧠
-
-```
-Input: All plans + all evidence results
-         ↓
-   Solver reads solver_prompt.txt
-         ↓
-   LLM synthesizes final project plan
-         ↓
-   Save as Markdown file (outputs/project_plan_*.md)
-         ↓
-   Return final result
-```
-
----
-
-## ✨ Features
-
-- 🤖 Automated Planning: Intelligent multi-step plan generation from prompts
-- 🧠 Document Intelligence (NEW): Classify, extract, and analyze PDFs for a high-signal planning context
-- 🗃️ Caching: Persist classifications/extractions/analysis for faster subsequent runs
-- 📄 PDF Processing: Extracts and analyzes documents using PyMuPDF
-- 🔍 Web Search Integration: Tavily-powered search for domain clarifications
-- 🧠 LLM Reasoning: Google Gemini 2.0 Flash for analysis and synthesis
-- 📊 Structured Output: Comprehensive Markdown project plans with 8 sections
-- 📓 Full LLM Logs: All prompts/responses captured in a Markdown execution log
-- 🎨 Rich Console UI: Beautiful terminal output with tables, panels, and progress indicators
-- 🔁 Stateful Execution: LangGraph manages state transitions seamlessly
-- 🛡️ Error Handling: Robust validation for query truncation and tool execution
-- 📦 Modular Design: Clean separation of concerns across components
-
----
-
-## 📁 Project Structure
-
-> **📖 See detailed structure documentation**: [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md)
-
-```
-pm-agent-using-rewoo/
-│
-├── src/                          # All application source code
-│   ├── agents/                   # Document processing agents
-│   ├── app/                      # Core application logic (Reflection workflow)
-│   ├── config/                   # Configuration modules
-│   ├── core/                     # Document Intelligence Pipeline
-│   ├── routes/                   # FastAPI API routes
-│   ├── states/                   # State definitions
-│   ├── tools/                    # External tool integrations
-│   └── utils/                    # Helper utilities
-│
-├── docs/                         # All documentation
-│   ├── setup/                    # Installation and setup guides
-│   ├── implementation/           # Technical implementation details
-│   └── guides/                   # User guides and troubleshooting
-│
-├── scripts/                      # Utility and setup scripts
-│   ├── setup/                    # Setup scripts (init, populate, fix)
-│   ├── testing/                  # Test scripts
-│   └── *.py                      # Utility scripts
-│
-├── data/                         # All data files (git-ignored)
-│   ├── files/                    # Input documents (PDFs)
-│   ├── uploads/                  # User-uploaded files
-│   ├── parsed_documents/         # Parsed document cache
-│   ├── embedding_cache/          # Global embedding cache
-│   ├── qdrant_storage/           # Qdrant vector database
-│   └── logs/                     # Application logs
-│
-├── tests/                        # Test files
-│
-├── prompts/                      # LLM prompt templates
-│
-├── frontend/                     # React frontend application
-│
-├── server.py                     # FastAPI server entry point
-├── docker-compose.yml            # Docker services configuration
-├── pyproject.toml                # Project metadata and dependencies
-├── requirements.txt              # Python dependencies
-└── README.md                     # This file
-```
-
----
-
-## 🚀 Installation
-
-### Prerequisites
-
-- Python 3.13 or higher
-- Google Gemini API key
-- Tavily API key
-
-### Using UV (Recommended)
-
-1. Install UV (if not already installed):
-
-   ```bash
-   # Windows (PowerShell)
-   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-   ```
-
-2. From your project folder, install dependencies:
-
-   ```bash
-   uv sync
-   ```
-
-3. Activate the virtual environment:
-
-   ```bash
-   # Windows (cmd.exe)
-   .venv\Scripts\activate
-   ```
-
-### Using pip
-
-1. Create a virtual environment:
-
-   ```bash
-   python -m venv venv
-   ```
-
-2. Activate the virtual environment:
-
-   ```bash
-   # Windows (cmd.exe)
-   venv\Scripts\activate
-   ```
-
-3. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-Create a `.env` file in the project root:
+Open `.env` and set at least:
 
 ```env
-GOOGLE_API_KEY=your_google_gemini_api_key_here
-TAVILY_API_KEY=your_tavily_api_key_here
+OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=...
+TAVILY_API_KEY=...
+LLM_PROVIDER=openai   # or gemini
 ```
 
-### API Keys Setup
+2. Start Qdrant (vector DB)
 
-1. Google Gemini API:
-
-   - Visit https://aistudio.google.com/app/api-keys
-   - Create a new API key
-   - Copy to `.env`
-
-2. Tavily API:
-   - Sign up at https://tavily.com/
-   - Get your API key from the dashboard
-   - Copy to `.env`
-
-### Model Configuration
-
-By default we use Google Gemini 2.0 Flash (see `src/config/llm_config.py`). You can change model/temperature there:
-
-```python
-model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    temperature=0.6,
-    google_api_key=GOOGLE_API_KEY
-)
+```cmd
+docker compose -f docker-compose.yml up -d qdrant
 ```
 
----
+3. Backend: create venv and install
 
-## 💻 Usage
-
-### Basic Usage
-
-1. Place your PDFs in the `data/files/` directory (any names; multiple files supported).
-
-2. (Recommended) Generate feasibility questions/assessment for Tech Lead review:
-
-   ```bash
-   # Windows (cmd.exe)
-   python scripts/generate_feasibility_questions.py
-   ```
-
-   This creates `data/outputs/feasibility_assessment.md`. Review and optionally fill in answers.
-
-3. Start the FastAPI server:
-
-   ```bash
-   # Windows (cmd.exe)
-   python server.py
-   ```
-
-4. Use the API endpoints or view the outputs:
-   - Final plan: `data/outputs/project_plan_YYYYMMDD_HHMMSS.md`
-   - Full execution log: `data/outputs/agent_execution_log_*.md`
-   - Intermediate artifacts: `data/outputs/intermediate/*`
-
-### Customizing the task and pipeline
-
-In `main.py`, you can tweak:
-
-- `task` string passed to `run_agent`
-- `use_document_intelligence=True|False` to enable/disable the pipeline
-- `enable_cache=True|False` to control caching behavior
-
-### Running Feasibility Agent directly
-
-You can also run the agent directly on your current `files/*.pdf` via:
-
-```bash
-# Windows (cmd.exe)
-python app\feasibility_agent.py
+```cmd
+py -3.13 -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-### Console Output
+4. Run the backend API
 
-The application provides beautiful formatted output:
-
-```
-════════════════════════════════════════════════
-🔍 Executing ReWOO Reasoning Graph
-════════════════════════════════════════════════
-
-═══════════════ 🧩 Planning Stage ═══════════════
-┌─── Generated Plan ───────────────────────────┐
-│ Plan: Read the BRD document...               │
-│ #E1 = FileReader['files/...']                │
-│ ...                                          │
-└───────────────────────────────────────────────┘
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃           Parsed Plan Steps                 ┃
-┣━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┫
-┃ Step  ┃ Evidence ID ┃ Tool     ┃ Input    ┃
-┡━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
-│ 1     │ #E1         │ FileRead │ files/...│
-└───────┴─────────────┴──────────┴──────────┘
-
-═══════════════ 🔧 Tool Execution ═══════════════
-┌─── Result of #E1 ───────────────────────────┐
-│ [Extracted BRD content...]                   │
-└───────────────────────────────────────────────┘
-
-═══════════════ 🧠 Final Solution ═══════════════
-┌─── Final Answer ─────────────────────────────┐
-│ # Complete Project Plan                      │
-│ ...                                          │
-└───────────────────────────────────────────────┘
+```cmd
+python server.py
 ```
 
----
+5. Frontend: install and run
 
-## 🔍 How It Works
-
-### ReWOO Pattern Explained
-
-1. Separation of Planning and Execution:
-
-   - Traditional ReAct: Plan → Observe → Plan → Observe (multiple LLM calls)
-   - ReWOO: Plan all → Execute all → Solve (fewer LLM calls, more efficient)
-
-2. Evidence-Based Reasoning:
-
-   - Each step produces evidence (e.g., #E1, #E2)
-   - Subsequent steps reference previous evidence
-   - Final solver uses all evidence to generate output
-
-3. Tool Orchestration:
-   - FileReader: Reads PDF documents, extracts text
-   - LLM: Performs reasoning, analysis, extraction
-   - Google: Searches web for clarifications (max 400 chars)
-
-### State Management
-
-```python
-class ReWOO(BaseModel):
-    task: str              # Initial user request
-    plan_string: str       # Generated plan text
-    steps: List[tuple]     # Parsed steps [(plan, evidence_id, tool, input)]
-    results: dict          # Execution results {evidence_id: result}
-    result: str            # Final synthesized output
-    document_context: str  # Context from Document Intelligence Pipeline (if enabled)
+```cmd
+cd frontend
+npm install
+npm run dev
 ```
 
-### Routing Logic
+Frontend runs at http://localhost:5173 and proxies API calls to http://localhost:8000.
 
-```python
-def route(state):
-    current_task = get_current_task(state)
-    if current_task is None:
-        return "solve"  # All steps done, go to solver
-    else:
-        return "tool"   # More steps to execute, loop back
+## Try it
+
+Option A – UI
+
+- Visit http://localhost:5173
+- Keep “Use default sample files” checked and click “Upload & Continue”
+- Continue to Feasibility → Generate Project Plan
+
+Option B – API (quick smoke test)
+
+```cmd
+curl http://localhost:8000/health/
+
+curl -X POST "http://localhost:8000/api/upload?use_default_files=true"
+
+:: Use the returned session_id below
+curl -X POST http://localhost:8000/api/feasibility ^
+  -H "Content-Type: application/json" ^
+  -d "{\"session_id\":\"<SESSION_ID>\",\"use_intelligent_processing\":true}"
+
+curl -X POST http://localhost:8000/api/generate-plan ^
+  -H "Content-Type: application/json" ^
+  -d "{\"session_id\":\"<SESSION_ID>\",\"use_intelligent_processing\":true,\"max_iterations\":5}"
 ```
 
----
+Outputs are saved under `outputs/` (feasibility report and final plan markdown files). Uploaded files are stored under `data/uploads/`.
 
-## 🧩 Components Deep Dive
+## Key endpoints
 
-### 1. Planner (`app/plan.py`)
+- GET `/health/` – service status
+- POST `/api/upload?use_default_files=true` – load PDFs from `data/files/`
+- POST `/api/upload` – upload your own PDFs (multipart, max 15 files)
+- POST `/api/feasibility` – body: `{ session_id, use_intelligent_processing, development_context? }`
+- POST `/api/generate-plan` – body: `{ session_id, use_intelligent_processing, max_iterations }`
+- GET `/api/file-content?file_path=<path>` – read saved markdown files (restricted to `outputs/` and `uploads/`)
 
-Purpose: Generate structured multi-step reasoning plans
+## Folders you’ll use
 
-Process:
+- `data/files/` – sample input PDFs
+- `data/uploads/` – uploaded PDFs (runtime)
+- `outputs/` – feasibility and plan markdown files
+- `qdrant_storage/` – persistent vector DB data (Docker volume)
 
-1. Loads `planner_prompt.txt`
-2. Invokes LLM with task description and either:
-   - Document Intelligence context (preferred)
-   - or legacy raw PDF text from `files/`
-3. Parses output using regex: `Plan:\s*(.+)\s*(#E\d+)\s*=\s*(\w+)\s*\[([^\]]+)\]`
-4. Returns structured steps
+## Troubleshooting
 
-Example Output:
+- Qdrant connection failed – ensure Docker is running: `docker compose up -d qdrant`
+- 401/invalid API key – check `OPENAI_API_KEY` (embeddings) and your chosen `LLM_PROVIDER` envs
+- Rate limits (429) – try again later or reduce iterations
+- Upload errors – only PDFs are accepted; max 15 files
 
-```python
-{
-    "plan_string": "Plan: Read BRD...\n#E1 = FileReader['files/brd.pdf']...",
-    "steps": [
-        ("Read BRD document", "#E1", "FileReader", "files/brd.pdf"),
-        ("Extract epics", "#E2", "LLM", "Identify modules from #E1"),
-        ...
-    ]
-}
-```
+## More docs
 
-### 2. Tool Executor (`app/tool_executor.py`)
+- Environment/config: `docs/ENV_CONFIGURATION.md`
+- Architecture and structure: `docs/PROJECT_STRUCTURE.md`, `docs/ARCHITECTURE_DIAGRAMS.md`
+- Migration and implementation notes: `docs/implementation/*`
 
-Purpose: Execute tools defined in the plan
-
-Supported Tools:
-
-- FileReader (PyMuPDF)
-- LLM (Gemini 2.0 Flash)
-- Google (Tavily Search; query truncated to 400 chars)
-
-Dependency Resolution:
-
-- Replaces `#E1`, `#E2`, etc. with actual results
-- Example: `"Analyze #E1"` → `"Analyze [actual BRD text]"`
-
-### 3. Solver (`app/solver.py`)
-
-Purpose: Synthesize final project plan from all evidence
-
-Process:
-
-1. Combines all plans and results
-2. Loads `solver_prompt.txt`
-3. Invokes LLM with complete context
-4. Saves output to `outputs/project_plan_TIMESTAMP.md`
-
-Sections Generated:
-
-- Project Overview
-- Epics/Modules
-- Functional Requirements (User Stories)
-- Non-Functional Requirements
-- Dependencies & Constraints
-- Risks & Assumptions
-- Project Milestones
-- Summary
-
-### 4. Graph (`app/graph.py`)
-
-Purpose: Orchestrate the workflow using LangGraph
-
-Nodes:
-
-- `plan`: Planning stage
-- `tool`: Tool execution (with loop)
-- `solve`: Final synthesis
-
-Edges:
-
-- `START → plan`
-- `plan → tool`
-- `tool → (conditional: tool or solve)`
-- `solve → END`
-
-### 5. Document Intelligence (`core/*`, `agents/*`)
-
-- `core/document_intelligence_pipeline.py`: Orchestrates classification, extraction, and analysis with caching
-- `agents/document_classifier.py`: Content-only classification (ignores filename)
-- `agents/content_extractor.py`: Type-aware extraction into a structured JSON-like schema
-- `core/document_analyzer.py`: Finds gaps/conflicts, consolidates risks/dependencies/constraints, produces Markdown/JSON reports
-- `core/cache_manager.py`: Caches per-file results and analysis for speed
-
----
-
-## 📊 Output Format
-
-Generated project plans follow this structure:
-
-```markdown
-# Project Name: Complete Project Plan
-
-## 1. Project Overview
-
-High-level summary, objectives, and scope
-
-## 2. Epics / Modules
-
-- Epic 1: Description
-  - Module components
-- Epic 2: Description
-  ...
-
-## 3. Functional Requirements (User Stories)
-
-### Epic 1
-
-- **US 1.1**: As a [user], I want [feature], so that [benefit]
-  - Acceptance Criteria: [...]
-- **US 1.2**: ...
-
-## 4. Non-Functional Requirements
-
-- Performance: [specifications]
-- Security: [requirements]
-- Scalability: [constraints]
-- Technology Stack: [details]
-
-## 5. Dependencies & Constraints
-
-- Technical dependencies
-- Third-party integrations
-- Timeline constraints
-
-## 6. Risks & Assumptions
-
-### Risks
-
-- Risk 1: [description] → Mitigation: [strategy]
-
-### Assumptions
-
-- Assumption 1: [description]
-
-## 7. Project Milestones
-
-### Phase 1: [Name] (Timeline)
-
-- Deliverable 1
-- Deliverable 2
-
-### Phase 2: [Name] (Timeline)
-
-...
-
-## 8. Summary
-
-Overall assessment and next steps
-```
-
----
-
-## 🧪 Testing
-
-Run the pipeline smoke test and legacy loader test:
-
-```bash
-# Windows (cmd.exe)
-python test_document_intelligence.py
-```
-
-Expected artifacts will be written under `outputs/test_intermediate/` and console will display coverage/readiness/confidence.
-
-## ⚠️ Known quirks
-
-- Feasibility file name mismatch: `generate_feasibility_questions.py` writes `outputs/feasibility_assessment.md` but the planner/solver currently read `outputs/feasibility_questions.md`. Until unified, please rename the file after generation (see Usage), or adjust the code paths in `app/plan.py` and `app/solver.py`.
-- Python 3.13 required (see `pyproject.toml`). If your default `python` points to an older version, use `py -3.13` on Windows when creating the venv.
-
-## 🧩 Dependencies
-
-Key libraries (see `requirements.txt` / `pyproject.toml`):
-
-- langgraph, langchain-core/community, langchain-google-genai, langchain-tavily
-- PyMuPDF (fitz)
-- rich, python-dotenv
-- numpy, pydantic, pyyaml, requests
-
-Python version: `>=3.13`
-
-## 🤝 Contributing
-
-Contributions are welcome! Typical flow:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m "Add amazing feature"`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-## 🙏 Acknowledgments
-
-- ReWOO Paper: https://arxiv.org/abs/2305.18323
-- LangGraph: State-of-the-art agent orchestration
-- Google Gemini: Powerful language model capabilities
-- Tavily: Advanced AI search API
-
----
-
-## 📧 Support
-
-For assessment, issues, or feature requests:
-
-- Open an issue on GitHub
-- Contact the maintainers
+—
