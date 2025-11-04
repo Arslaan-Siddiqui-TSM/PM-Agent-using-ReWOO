@@ -18,20 +18,9 @@ wheels/
 # Lock files
 *.lock
 
-# Data directory - all data files
-data/outputs/
-data/uploads/
-data/parsed_documents/*
-!data/parsed_documents/.gitkeep
-data/embedding/*
-data/embedding_cache/*
-!data/embedding_cache/.gitkeep
-!data/embedding_cache/metadata/
-data/vector_store/*
-!data/vector_store/.gitkeep
-data/qdrant_storage/
-data/logs/*
-!data/logs/.gitkeep
+# Data directory
+data/
+!data/files
 
 # cache
 cache/
