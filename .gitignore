@@ -35,6 +35,3 @@ data/logs/*
 
 # cache
 cache/
-
-# Markdown files (deprecated architecture diagrams)
-ARCHITECTURE_DIAGRAMS.md
