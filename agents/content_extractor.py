@@ -127,10 +127,10 @@ class ContentExtractorAgent:
                     text_parts.append(page_text)
                     total_chars += len(page_text)
                 
-                    full_text = "\n\n".join(text_parts)
-                    # Normalize text to reduce token usage
-                    normalized = self._normalize_text(full_text)
-                    return normalized if normalized else None
+                full_text = "\n\n".join(text_parts)
+                # Normalize text to reduce token usage
+                normalized = self._normalize_text(full_text)
+                return normalized if normalized else ""
                 
         except Exception as e:
             return f"[Error extracting text: {str(e)}]"

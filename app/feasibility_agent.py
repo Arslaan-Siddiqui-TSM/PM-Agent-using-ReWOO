@@ -49,7 +49,7 @@ def extract_text_from_pdfs(file_paths: list[str]) -> str:
     return all_text.strip()
 
 
-def generate_feasibility_questions(document_text: str, development_context: dict = None, session_id: str = "unknown") -> dict:
+def generate_feasibility_questions(document_text: str, development_context: dict | None = None, session_id: str = "unknown") -> dict:
     """Generate feasibility questions for the Tech Lead review.
 
     Args:
@@ -250,7 +250,7 @@ def save_questions_to_markdown(questions_md: str, file_name: str, output_dir="ou
     return output_path
 
 
-def run_feasibility_agent(file_paths: list[str], development_context: dict = None, session_id: str = "standalone") -> tuple[str, str]:
+def run_feasibility_agent(file_paths: list[str], development_context: dict | None = None, session_id: str = "standalone") -> tuple[str, str]:
     """Run the feasibility agent on multiple documents, producing two markdown files.
     
     Args:
