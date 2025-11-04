@@ -315,6 +315,7 @@ async def check_feasibility(request: FeasibilityRequest):
         max_retries = 3
         retry_delay = 5
         feasibility_assessment = None
+        feasibility_result = None
         
         for attempt in range(max_retries):
             try:
