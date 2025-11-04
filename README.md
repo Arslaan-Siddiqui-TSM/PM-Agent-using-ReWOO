@@ -2,6 +2,20 @@
 
 An end-to-end implementation of the ReWOO (Reasoning WithOut Observation) paradigm using LangGraph, designed to turn multiple project documents (BRDs, specs, test plans, etc.) into a comprehensive project plan. This repo adds a Document Intelligence Pipeline that classifies, extracts, and analyzes PDFs to produce a clean planning context before ReWOO planning and execution.
 
+## 🆕 New Professional Structure
+
+**The codebase has been restructured following industry best practices!**
+
+- ✅ **Organized source code** in `src/` directory
+- ✅ **Categorized documentation** in `docs/` with subdirectories
+- ✅ **Consolidated data files** in `data/` directory
+- ✅ **Organized scripts** in `scripts/` directory
+- ✅ **Cleaned root directory** for professional appearance
+
+**📖 See full details**: [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) | **📝 Summary**: [`RESTRUCTURING_SUMMARY.md`](RESTRUCTURING_SUMMARY.md)
+
+---
+
 ## 📋 Table of Contents
 
 - [Overview](#overview)
@@ -192,56 +206,49 @@ Input: All plans + all evidence results
 
 ## 📁 Project Structure
 
+> **📖 See detailed structure documentation**: [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md)
+
 ```
-rewoo-demonstration/
+pm-agent-using-rewoo/
 │
-├── app/                          # Core application logic
-│   ├── graph.py                  # LangGraph workflow definition
-│   ├── plan.py                   # Planning node implementation
-│   ├── solver.py                 # Solving node implementation
-│   └── tool_executor.py          # Tool execution node
+├── src/                          # All application source code
+│   ├── agents/                   # Document processing agents
+│   ├── app/                      # Core application logic (Reflection workflow)
+│   ├── config/                   # Configuration modules
+│   ├── core/                     # Document Intelligence Pipeline
+│   ├── routes/                   # FastAPI API routes
+│   ├── states/                   # State definitions
+│   ├── tools/                    # External tool integrations
+│   └── utils/                    # Helper utilities
 │
-├── core/                         # Document Intelligence Pipeline
-│   ├── document_intelligence_pipeline.py  # Orchestrates classify → extract → analyze
-│   ├── document_analyzer.py      # Cross-doc analysis and reporting
-│   └── cache_manager.py          # Caching for performance
+├── docs/                         # All documentation
+│   ├── setup/                    # Installation and setup guides
+│   ├── implementation/           # Technical implementation details
+│   └── guides/                   # User guides and troubleshooting
 │
-├── agents/                       # LLM-based agents
-│   ├── document_classifier.py    # Content-based PDF classification
-│   └── content_extractor.py      # Type-aware content extraction
+├── scripts/                      # Utility and setup scripts
+│   ├── setup/                    # Setup scripts (init, populate, fix)
+│   ├── testing/                  # Test scripts
+│   └── *.py                      # Utility scripts
 │
-├── config/                       # Configuration modules
-│   ├── llm_config.py             # LLM setup (Google Gemini)
-│   └── document_intelligence_config.py  # Pipeline configuration
+├── data/                         # All data files (git-ignored)
+│   ├── files/                    # Input documents (PDFs)
+│   ├── uploads/                  # User-uploaded files
+│   ├── parsed_documents/         # Parsed document cache
+│   ├── embedding_cache/          # Global embedding cache
+│   ├── qdrant_storage/           # Qdrant vector database
+│   └── logs/                     # Application logs
 │
-├── states/                       # State definitions
-│   └── rewoo_state.py            # ReWOO state Pydantic model
-│
-├── tools/                        # External tool integrations
-│   └── search_tool.py            # Tavily search wrapper
-│
-├── utils/                        # Helper utilities
-│   └── helper.py                 # Routing, task mgmt, logging utils
+├── tests/                        # Test files
 │
 ├── prompts/                      # LLM prompt templates
-│   ├── planner_prompt.txt        # Planning stage instructions
-│   ├── solver_prompt.txt         # Solving stage instructions
-│   └── feasibility_prompt.txt    # Feasibility Q/A generator
 │
-├── files/                        # Input documents (PDFs)
-│   └── ...                       # Place your PDFs here
+├── frontend/                     # React frontend application
 │
-├── outputs/                      # Generated artifacts
-│   ├── project_plan_*.md         # Final project plans
-│   ├── agent_execution_log_*.md  # Full LLM prompts/responses log
-│   └── intermediate/             # Pipeline JSON/MD reports
-│
-├── main.py                       # Application entry point (pipeline + ReWOO)
-├── generate_feasibility_questions.py  # Create feasibility assessment MD
-├── test_document_intelligence.py # Pipeline smoke test
+├── server.py                     # FastAPI server entry point
+├── docker-compose.yml            # Docker services configuration
 ├── pyproject.toml                # Project metadata and dependencies
-├── requirements.txt              # Frozen deps for pip installs
-├── uv.lock                       # UV lock file
+├── requirements.txt              # Python dependencies
 └── README.md                     # This file
 ```
 
@@ -326,7 +333,7 @@ TAVILY_API_KEY=your_tavily_api_key_here
 
 ### Model Configuration
 
-By default we use Google Gemini 2.0 Flash (see `config/llm_config.py`). You can change model/temperature there:
+By default we use Google Gemini 2.0 Flash (see `src/config/llm_config.py`). You can change model/temperature there:
 
 ```python
 model = ChatGoogleGenerativeAI(
@@ -342,34 +349,28 @@ model = ChatGoogleGenerativeAI(
 
 ### Basic Usage
 
-1. Place your PDFs in the `files/` directory (any names; multiple files supported).
+1. Place your PDFs in the `data/files/` directory (any names; multiple files supported).
 
 2. (Recommended) Generate feasibility questions/assessment for Tech Lead review:
 
    ```bash
    # Windows (cmd.exe)
-   python generate_feasibility_questions.py
+   python scripts/generate_feasibility_questions.py
    ```
 
-   This creates `outputs/feasibility_assessment.md`. Review and optionally fill in answers.
+   This creates `data/outputs/feasibility_assessment.md`. Review and optionally fill in answers.
 
-   Important: the current planner/solver looks for `outputs/feasibility_questions.md`. Until we consolidate names, either:
-
-   - Rename the generated file (Windows cmd):
-     - `ren outputs\feasibility_assessment.md feasibility_questions.md`
-   - OR update the code to point to your file.
-
-3. Run the main application (automatically processes all PDFs and uses the Document Intelligence Pipeline by default):
+3. Start the FastAPI server:
 
    ```bash
    # Windows (cmd.exe)
-   python main.py
+   python server.py
    ```
 
-4. View the outputs:
-   - Final plan: `outputs/project_plan_YYYYMMDD_HHMMSS.md`
-   - Full execution log: `outputs/agent_execution_log_*.md`
-   - Intermediate artifacts: `outputs/intermediate/*`
+4. Use the API endpoints or view the outputs:
+   - Final plan: `data/outputs/project_plan_YYYYMMDD_HHMMSS.md`
+   - Full execution log: `data/outputs/agent_execution_log_*.md`
+   - Intermediate artifacts: `data/outputs/intermediate/*`
 
 ### Customizing the task and pipeline
 

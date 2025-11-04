@@ -14,6 +14,7 @@ dependencies = [
     "pymupdf>=1.26.5",
     "python-multipart>=0.0.20",
     "rich>=14.2.0",
+    "langchain-docling>=1.1.0",	
 ]
 
 [tool.uv.workspace]

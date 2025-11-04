@@ -18,12 +18,23 @@ wheels/
 # Lock files
 *.lock
 
-# Data files
-outputs/
-uploads/
-
-# Markdown files
-ARCHITECTURE_DIAGRAMS.md
+# Data directory - all data files
+data/outputs/
+data/uploads/
+data/parsed_documents/*
+!data/parsed_documents/.gitkeep
+data/embedding/*
+data/embedding_cache/*
+!data/embedding_cache/.gitkeep
+!data/embedding_cache/metadata/
+data/vector_store/*
+!data/vector_store/.gitkeep
+data/qdrant_storage/
+data/logs/*
+!data/logs/.gitkeep
 
 # cache
 cache/
+
+# Markdown files (deprecated architecture diagrams)
+ARCHITECTURE_DIAGRAMS.md

@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes.planning_agent import router as agent_router
-from routes.utils_endpoints import router as utils_router
-from routes.health_check import router as health_router
+from src.routes.planning_agent import router as agent_router
+from src.routes.utils_endpoints import router as utils_router
+from src.routes.health_check import router as health_router
 
 # Create FastAPI app
 app = FastAPI(
