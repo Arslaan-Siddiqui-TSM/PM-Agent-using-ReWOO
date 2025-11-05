@@ -31,7 +31,7 @@ class Session:
         self.development_context = None
         self.feasibility_assessment = None
         self.feasibility_file_path = None
-        self.pipeline_result = None
+        self.pipeline_result: Optional[Dict[str, Any]] = None
         self.use_intelligent_processing = True
         
         # RAG/Qdrant fields
