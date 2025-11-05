@@ -24,5 +24,8 @@ env/
 data/
 !data/files
 
+# Outputs
+outputs/
+
 # cache
 cache/

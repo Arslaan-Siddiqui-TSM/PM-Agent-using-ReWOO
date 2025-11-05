@@ -230,11 +230,12 @@
 }
 
 .question-category {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
   padding: 1.5rem;
   background: #f9f9ff;
-  border-radius: 8px;
+  border-radius: 10px;
   border-left: 4px solid #667eea;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .question-category h4 {
@@ -290,14 +291,42 @@
   transition: border-color 0.3s ease;
 }
 
+.feedback-textarea::placeholder {
+  color: #999;
+  opacity: 1;
+  font-style: italic;
+}
+
 .feedback-textarea:focus {
   outline: none;
   border-color: #667eea;
 }
 
+.feedback-textarea:focus::placeholder {
+  color: #bbb;
+}
+
 /* Static Questions Form */
 .static-questions-form {
   margin-top: 1.5rem;
+}
+
+.required-note {
+  display: block;
+  margin-top: 0.5rem;
+  color: #d32f2f;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.category-title {
+  color: #667eea;
+  margin-bottom: 1.5rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .form-group {
@@ -309,14 +338,24 @@
   color: #333;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .form-group label .optional {
   font-weight: 400;
   color: #888;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-style: italic;
+  white-space: nowrap;
+}
+
+.form-group label .required {
+  color: #d32f2f;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-left: 0.2rem;
+  white-space: nowrap;
 }
 
 .form-input {
@@ -329,10 +368,20 @@
   transition: border-color 0.3s ease;
 }
 
+.form-input::placeholder {
+  color: #999;
+  opacity: 1;
+  font-style: italic;
+}
+
 .form-input:focus {
   outline: none;
   border-color: #667eea;
   background: #f9f9ff;
+}
+
+.form-input:focus::placeholder {
+  color: #bbb;
 }
 
 .form-textarea {
@@ -347,10 +396,20 @@
   min-height: 80px;
 }
 
+.form-textarea::placeholder {
+  color: #999;
+  opacity: 1;
+  font-style: italic;
+}
+
 .form-textarea:focus {
   outline: none;
   border-color: #667eea;
   background: #f9f9ff;
+}
+
+.form-textarea:focus::placeholder {
+  color: #bbb;
 }
 
 .file-path {

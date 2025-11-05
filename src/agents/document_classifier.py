@@ -235,13 +235,24 @@ Provide ONLY the JSON response, no additional text.
             # Parse secondary types
             secondary_types = []
             for item in result.get("secondary_types", []):
-                secondary_types.append((item["type"], item["confidence"]))
+                try:
+                    conf = float(item["confidence"])
+                except (ValueError, TypeError):
+                    conf = 0.0
+                secondary_types.append((item["type"], conf))
+            
+            # Ensure primary confidence is a float
+            try:
+                primary_confidence = float(result["confidence"])
+            except (ValueError, TypeError):
+                print(f"WARNING: classification confidence is {type(result.get('confidence'))}, using default 0.5")
+                primary_confidence = 0.5
             
             return DocumentClassification(
                 filename=filename,
                 filepath=filepath,
                 document_type=result["primary_type"],
-                confidence=result["confidence"],
+                confidence=primary_confidence,
                 secondary_types=secondary_types,
                 key_indicators=result.get("key_indicators", []),
                 page_count=page_count,
