@@ -54,14 +54,18 @@ class UnifiedLLM:
     def __init__(
         self,
         provider: str = "openai",
-        temperature: float = 0.2,
+        temperature: float = None,  # None = use model default
         openai_model: str = "o4-mini",
         gemini_model: str = "gemini-2.5-pro",
+        max_output_tokens: int = 8192,
+        request_timeout: int = 120,
     ) -> None:
         self.provider = provider.lower().strip()
-        self.temperature = temperature
+        self.temperature = temperature  # Can be None
         self.openai_model = os.getenv("OPENAI_MODEL", openai_model)
         self.gemini_model = os.getenv("GEMINI_MODEL", gemini_model)
+        self.max_output_tokens = max_output_tokens
+        self.request_timeout = request_timeout
 
         self._init_clients()
 
@@ -85,7 +89,8 @@ class UnifiedLLM:
                         temperature=self.temperature,
                         google_api_key=google_api_key,
                         max_retries=6,
-                        request_timeout=120,
+                        request_timeout=self.request_timeout,
+                        max_output_tokens=self.max_output_tokens,
                     )
                     return
                 raise RuntimeError("Missing OPENAI_API_KEY in environment.")
@@ -105,7 +110,8 @@ class UnifiedLLM:
                 temperature=self.temperature,
                 google_api_key=google_api_key,
                 max_retries=6,
-                request_timeout=120,
+                request_timeout=self.request_timeout,
+                max_output_tokens=self.max_output_tokens,
             )
         else:
             # Default to OpenAI if unknown provider
@@ -149,11 +155,15 @@ class UnifiedLLM:
             return _AIMessage(content=str(text))
         else:
             # Chat Completions API for non-reasoning models
-            resp = self.openai_client.chat.completions.create(
-                model=model_name,
-                temperature=self.temperature,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            # Only pass temperature if specified (not None)
+            kwargs = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if self.temperature is not None:
+                kwargs["temperature"] = self.temperature
+            
+            resp = self.openai_client.chat.completions.create(**kwargs)
             text = (resp.choices[0].message.content if resp.choices else "")
             return _AIMessage(content=str(text))
 
@@ -176,6 +186,22 @@ class UnifiedLLM:
 # Read provider preference from environment, default to OpenAI
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
 
-# Single export used across the app
-model = UnifiedLLM(provider=LLM_PROVIDER)
+# Converter-specific configuration
+CONVERTER_PROVIDER = os.getenv("CONVERTER_PROVIDER", LLM_PROVIDER).lower()
+CONVERTER_MODEL = os.getenv("CONVERTER_MODEL", "gpt-4o-mini")  # Default to mini model
+USE_LLM_CONVERTER = os.getenv("USE_LLM_CONVERTER", "true").lower() in ("true", "1", "yes")
+
+# Single export used across the app (main model for analysis)
+# Don't specify temperature - use model defaults
+model = UnifiedLLM(provider=LLM_PROVIDER, temperature=None)
+
+# Separate converter model for MD → JSON conversion (mini model)
+# Note: temperature=None to use model defaults - avoids compatibility issues
+converter_model = UnifiedLLM(
+    provider=CONVERTER_PROVIDER,
+    temperature=None,  # Use model default
+    openai_model=CONVERTER_MODEL if CONVERTER_PROVIDER == "openai" else "gpt-4o-mini",
+    gemini_model=CONVERTER_MODEL if CONVERTER_PROVIDER in ("gemini", "google") else "gemini-1.5-flash",
+    max_output_tokens=16000  # Large output for JSON
+)
 

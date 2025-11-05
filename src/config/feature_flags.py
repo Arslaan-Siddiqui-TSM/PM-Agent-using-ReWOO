@@ -31,7 +31,9 @@ class FeatureFlags(BaseSettings):
     parallel_workers: int = 4  # Thread pool size for CPU-bound tasks
     
     # RAG/Embedding configuration (if enabled)
+    embedding_provider: str = "openai"  # "openai" or "gemini"
     embedding_model: str = "text-embedding-3-large"  # OpenAI embedding model
+    gemini_embedding_model: str = "models/text-embedding-004"  # Gemini embedding model
     qdrant_url: str = "http://localhost:6333"  # Qdrant server URL
     qdrant_collection_prefix: str = "pm_agent"  # Collection name prefix
     max_chunk_size: int = 1000  # Chunk size for RAG

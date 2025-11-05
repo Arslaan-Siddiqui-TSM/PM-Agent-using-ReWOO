@@ -478,12 +478,6 @@
   margin-right: 0.5rem;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .loading-container {
   display: flex;
   align-items: center;
@@ -500,6 +494,12 @@
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-right: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Markdown Content Styling */
@@ -726,4 +726,94 @@
   .markdown-wrapper h3 {
     font-size: 1.1rem;
   }
+}
+
+/* Processing Status Indicator */
+.processing-status {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #ddd;
+  animation: fadeIn 0.3s ease;
+}
+
+.processing-status.processing,
+.processing-status.pending {
+  background: #fff8e1;
+  border-color: #ffa726;
+}
+
+.processing-status.completed {
+  background: #e8f5e9;
+  border-color: #66bb6a;
+}
+
+.processing-status.failed {
+  background: #ffebee;
+  border-color: #ef5350;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.status-text {
+  flex: 1;
+}
+
+.status-text strong {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.status-text p {
+  color: #666;
+  line-height: 1.6;
+  margin: 0.5rem 0;
+}
+
+.status-text.success strong {
+  color: #2e7d32;
+}
+
+.status-text.error strong {
+  color: #c62828;
+}
+
+.status-message {
+  font-size: 0.95rem;
+  color: #555;
+  font-style: italic;
+  margin-top: 0.5rem;
+}
+
+/* Spinner Animation */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 167, 38, 0.3);
+  border-top-color: #ffa726;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+.processing-status.completed .spinner {
+  display: none;
+}
+
+/* Helper Text */
+.helper-text {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  color: #666;
+  font-size: 0.95rem;
+  text-align: center;
+  border-left: 4px solid #667eea;
 }

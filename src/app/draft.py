@@ -34,7 +34,7 @@ def generate_draft(state: ReflectionState) -> Dict[str, object]:
         document_context = state.document_context
         context_source = "Document Intelligence Pipeline"
     else:
-        files_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "files"))
+        files_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "files"))
         document_context = load_all_documents_from_directory(files_dir)
         context_source = "Raw PDF ingestion"
 

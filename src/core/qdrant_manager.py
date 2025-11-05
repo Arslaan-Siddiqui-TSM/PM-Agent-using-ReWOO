@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.documents import Document
 from langchain_text_splitters  import RecursiveCharacterTextSplitter
@@ -27,7 +28,7 @@ class QdrantManager:
     """
     Manages vector embeddings and semantic search for document retrieval.
     
-    Uses Qdrant for vector storage and OpenAI embeddings for semantic similarity.
+    Uses Qdrant for vector storage with configurable embedding providers (OpenAI or Gemini).
     """
     
     def __init__(
@@ -35,6 +36,7 @@ class QdrantManager:
         session_id: str,
         qdrant_url: Optional[str] = None,
         embedding_model: Optional[str] = None,
+        embedding_provider: Optional[str] = None,
         chunk_size: Optional[int] = None,
         chunk_overlap: Optional[int] = None
     ):
@@ -44,7 +46,8 @@ class QdrantManager:
         Args:
             session_id: Unique session identifier (used for collection name)
             qdrant_url: URL of Qdrant server
-            embedding_model: OpenAI embedding model name
+            embedding_model: Embedding model name
+            embedding_provider: "openai" or "gemini"
             chunk_size: Size of text chunks for embedding
             chunk_overlap: Overlap between chunks
         """
@@ -54,24 +57,45 @@ class QdrantManager:
         
         # Use feature flags or provided values
         self.qdrant_url = qdrant_url or feature_flags.qdrant_url
-        self.embedding_model = embedding_model or feature_flags.embedding_model
+        self.embedding_provider = (embedding_provider or feature_flags.embedding_provider).lower()
+        
+        # Select model based on provider
+        if self.embedding_provider == "gemini":
+            self.embedding_model = embedding_model or feature_flags.gemini_embedding_model
+        else:
+            self.embedding_model = embedding_model or feature_flags.embedding_model
+        
         self.chunk_size = chunk_size or feature_flags.max_chunk_size
         self.chunk_overlap = chunk_overlap or feature_flags.chunk_overlap
         
         logger.info(
             f"Initializing QdrantManager for session {session_id[:8]}: "
-            f"url={self.qdrant_url}, model={self.embedding_model}, "
-            f"chunks={self.chunk_size}/{self.chunk_overlap}"
+            f"provider={self.embedding_provider}, url={self.qdrant_url}, "
+            f"model={self.embedding_model}, chunks={self.chunk_size}/{self.chunk_overlap}"
         )
         
-        # Initialize embeddings
+        # Initialize embeddings based on provider
         try:
-            self.embeddings = OpenAIEmbeddings(model=self.embedding_model)
-            logger.info(f"OpenAI embeddings initialized: {self.embedding_model}")
+            if self.embedding_provider == "gemini":
+                self.embeddings = GoogleGenerativeAIEmbeddings(
+                    model=self.embedding_model,
+                    google_api_key=os.getenv("GOOGLE_API_KEY")
+                )
+                logger.info(f"Gemini embeddings initialized: {self.embedding_model}")
+            elif self.embedding_provider == "openai":
+                self.embeddings = OpenAIEmbeddings(model=self.embedding_model)
+                logger.info(f"OpenAI embeddings initialized: {self.embedding_model}")
+            else:
+                raise ValueError(
+                    f"Unsupported embedding provider: {self.embedding_provider}. "
+                    f"Supported: 'openai', 'gemini'"
+                )
         except Exception as e:
-            logger.error(f"Failed to initialize OpenAI embeddings: {e}")
+            logger.error(f"Failed to initialize embeddings: {e}")
+            api_key_name = "GOOGLE_API_KEY" if self.embedding_provider == "gemini" else "OPENAI_API_KEY"
             raise RuntimeError(
-                f"Failed to initialize embeddings. Ensure OPENAI_API_KEY is set. Error: {e}"
+                f"Failed to initialize {self.embedding_provider} embeddings. "
+                f"Ensure {api_key_name} is set in .env. Error: {e}"
             )
         
         # Initialize Qdrant client
@@ -100,10 +124,16 @@ class QdrantManager:
         """Initialize or connect to Qdrant vectorstore."""
         
         try:
-            # Determine embedding dimensions based on model
-            # text-embedding-3-small: 1536 dims
-            # text-embedding-3-large: 3072 dims
-            dimension = 3072 if "large" in self.embedding_model else 1536
+            # Determine embedding dimensions based on provider and model
+            if self.embedding_provider == "gemini":
+                # Gemini text-embedding-004: 768 dims
+                dimension = 768
+            elif "large" in self.embedding_model:
+                # OpenAI text-embedding-3-large: 3072 dims
+                dimension = 3072
+            else:
+                # OpenAI text-embedding-3-small: 1536 dims
+                dimension = 1536
             
             # Check if collection exists
             collections = self.client.get_collections().collections
@@ -230,6 +260,48 @@ class QdrantManager:
         except Exception as e:
             logger.error(f"Failed to add documents to vector store: {e}")
             raise RuntimeError(f"Failed to ingest documents: {e}")
+    
+    def ingest_langchain_documents(self, langchain_docs: List[Document]) -> Dict[str, Any]:
+        """
+        Ingest LangChain Document objects directly into the vector store.
+        
+        This method accepts pre-loaded LangChain Documents (e.g., from UnstructuredMarkdownLoader)
+        and chunks them before adding to Qdrant.
+        
+        Args:
+            langchain_docs: List of LangChain Document objects with structured content
+            
+        Returns:
+            Dictionary with ingestion statistics
+        """
+        if not langchain_docs:
+            logger.warning("No documents provided for ingestion")
+            return {"chunks_created": 0, "chunks_added": 0, "documents_processed": 0}
+        
+        logger.info(f"Ingesting {len(langchain_docs)} LangChain document(s) into Qdrant...")
+        
+        try:
+            # Chunk the documents using text splitter
+            all_chunks = self.text_splitter.split_documents(langchain_docs)
+            
+            logger.info(f"  → Created {len(all_chunks)} chunks from {len(langchain_docs)} documents")
+            
+            # Add documents to vector store and get IDs
+            ids = self.vectorstore.add_documents(all_chunks)
+            
+            logger.info(f"✅ Successfully added {len(all_chunks)} chunks to Qdrant collection: {self.collection_name}\n")
+            
+            return {
+                "documents_processed": len(langchain_docs),
+                "chunks_created": len(all_chunks),
+                "chunks_added": len(all_chunks),
+                "collection_name": self.collection_name,
+                "point_ids": ids if ids else []
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to add LangChain documents to vector store: {e}")
+            raise RuntimeError(f"Failed to ingest LangChain documents: {e}")
     
     def copy_cached_embeddings(
         self,
