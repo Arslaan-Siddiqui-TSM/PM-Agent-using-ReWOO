@@ -32,7 +32,6 @@ class Session:
         processing_error: Error message if processing failed
     """
     def __init__(self, session_id: str):
-<<<<<<< Updated upstream
         self.session_id: str = session_id
         self.created_at: datetime = datetime.now()
         self.document_paths: List[str] = []
@@ -41,19 +40,11 @@ class Session:
         self.feasibility_file_path: Optional[str] = None
         self.pipeline_result: Optional[Dict[str, Any]] = None
         self.use_intelligent_processing: bool = True
-=======
-        self.session_id = session_id
-        self.created_at = datetime.now()
-        self.document_paths = []
-        self.development_context = None
-        self.feasibility_assessment = None
-        self.feasibility_file_path = None
         
         # Processing status fields
-        self.processing_status = "pending"  # pending/processing/completed/failed
-        self.status_message = ""
-        self.processing_error = None
->>>>>>> Stashed changes
+        self.processing_status: str = "pending"  # pending/processing/completed/failed
+        self.status_message: str = ""
+        self.processing_error: Optional[str] = None
         
         # RAG/Qdrant fields
         self.parsed_documents: Optional[List[Any]] = None
