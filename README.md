@@ -17,10 +17,10 @@ Quick, simple, and local-friendly.
 - Node.js 18+ (for the frontend)
 - Docker (for Qdrant)
 - API keys:
-  - OpenAI: required for embeddings (text-embedding-3-\*)
-  - Google Gemini or OpenAI: for the LLM (choose via env)
+  - OpenAI or Google Gemini: for the LLM (choose via `LLM_PROVIDER` env var)
+  - OpenAI or Google Gemini: for embeddings (choose via `EMBEDDING_PROVIDER` env var)
 
-Note: Even if you use Gemini for the LLM, OpenAI API key is still needed for embeddings unless you modify code to use a different embedding provider.
+Note: You can mix and match providers! For example: use Gemini for LLM and OpenAI for embeddings, or vice versa.
 
 ## Setup (Windows cmd)
 
@@ -36,7 +36,8 @@ Open `.env` and set at least:
 OPENAI_API_KEY=sk-...
 GOOGLE_API_KEY=...
 TAVILY_API_KEY=...
-LLM_PROVIDER=openai   # or gemini
+LLM_PROVIDER=openai          # or gemini (for chat/reasoning)
+EMBEDDING_PROVIDER=openai    # or gemini (for vector embeddings)
 ```
 
 2. Start Qdrant (vector DB)

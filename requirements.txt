@@ -37,6 +37,7 @@ jsonpointer==3.0.0
 langchain==0.3.27
 langchain-community==0.3.31
 langchain-core==0.3.79
+unstructured==0.11.8
 langchain-google-genai==2.1.12
 openai>=1.52.0
 langchain-openai==0.2.14
@@ -45,9 +46,9 @@ langchain-text-splitters==0.3.11
 langchain-qdrant==0.2.0
 qdrant-client==1.11.3
 langchain-docling==1.1.0
-langgraph==0.6.10
-langgraph-checkpoint==2.1.2
-langgraph-prebuilt==0.6.4
+langgraph==1.0.2
+langgraph-checkpoint==3.0.0
+langgraph-prebuilt==1.0.2
 langgraph-sdk==0.2.9
 langsmith==0.4.34
 markdown-it-py==4.0.0
