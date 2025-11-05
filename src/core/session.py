@@ -25,14 +25,14 @@ class Session:
         parsing_log_path: Path to parsing log JSON file
     """
     def __init__(self, session_id: str):
-        self.session_id = session_id
-        self.created_at = datetime.now()
-        self.document_paths = []
-        self.development_context = None
-        self.feasibility_assessment = None
-        self.feasibility_file_path = None
+        self.session_id: str = session_id
+        self.created_at: datetime = datetime.now()
+        self.document_paths: List[str] = []
+        self.development_context: Optional[str] = None
+        self.feasibility_assessment: Optional[str] = None
+        self.feasibility_file_path: Optional[str] = None
         self.pipeline_result: Optional[Dict[str, Any]] = None
-        self.use_intelligent_processing = True
+        self.use_intelligent_processing: bool = True
         
         # RAG/Qdrant fields
         self.parsed_documents: Optional[List[Any]] = None
