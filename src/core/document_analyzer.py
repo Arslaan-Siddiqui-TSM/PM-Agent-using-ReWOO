@@ -223,7 +223,8 @@ class DocumentAnalyzer:
         
         # Check technical specifications
         has_technical_specs = any(
-            e.technical_details.get("architecture") or e.technical_details.get("technology_stack")
+            isinstance(e.technical_details, dict) and 
+            (e.technical_details.get("architecture") or e.technical_details.get("technology_stack"))
             for e in extractions
         )
         if not has_technical_specs:
@@ -344,13 +345,24 @@ class DocumentAnalyzer:
         
         # Check for conflicting requirements priorities
         req_conflicts = self._check_requirement_conflicts(extractions)
+        
+        # Debug: validate req_conflicts structure
+        if req_conflicts and not all(isinstance(c, dict) for c in req_conflicts):
+            print(f"WARNING: _check_requirement_conflicts returned non-dict items: {type(req_conflicts)}")
+            print(f"First few items: {req_conflicts[:3] if len(req_conflicts) > 3 else req_conflicts}")
+        
         conflicts.extend(req_conflicts)
         
         # Count by severity
         severity_counts = {"high": 0, "medium": 0, "low": 0}
         for conflict in conflicts + inconsistencies:
-            severity = conflict.get("severity", "low")
-            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            # Defensive check: ensure conflict is a dict before calling .get()
+            if isinstance(conflict, dict):
+                severity = conflict.get("severity", "low")
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            else:
+                print(f"WARNING: Unexpected conflict type: {type(conflict)} - {conflict}")
+                severity_counts["low"] += 1
         
         return DocumentConflictAnalysis(
             conflicts=conflicts,
@@ -372,6 +384,11 @@ class DocumentAnalyzer:
         all_requirements = []
         for extraction in extractions:
             for req in extraction.requirements:
+                # Defensive check: ensure req is a dict, not a list or other type
+                if not isinstance(req, dict):
+                    print(f"WARNING: Skipping non-dict requirement from {extraction.filename}: {type(req)} - {req}")
+                    continue
+                    
                 all_requirements.append({
                     "source": extraction.filename,
                     "req": req

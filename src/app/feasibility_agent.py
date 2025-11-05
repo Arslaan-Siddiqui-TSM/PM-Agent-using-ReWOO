@@ -65,7 +65,8 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Development context provided: {development_context is not None}")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Session ID: {session_id}")
     
-    prompt_path = os.path.join(os.path.dirname(__file__), "..", "prompts", "feasibility_promptv2.txt")
+    # Go up two levels from src/app/ to reach project root, then into prompts/
+    prompt_path = os.path.join(os.path.dirname(__file__), "..", "..", "prompts", "feasibility_promptv2.txt")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading prompt from: {prompt_path}")
     
     with open(prompt_path, "r", encoding="utf-8") as f:

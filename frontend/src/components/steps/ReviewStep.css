@@ -1,1 +1,48 @@
 /* Review step styles are inherited from App.css */
+
+/* Feedback Section */
+.feedback-section {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  margin: 30px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.feedback-section h3 {
+  color: #333;
+  margin: 0 0 10px 0;
+  font-size: 1.4em;
+  font-weight: 600;
+}
+
+.feedback-hint {
+  color: #666;
+  margin: 0 0 15px 0;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.feedback-textarea {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1em;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feedback-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.feedback-textarea::placeholder {
+  color: #999;
+  opacity: 1;
+  font-style: italic;
+}

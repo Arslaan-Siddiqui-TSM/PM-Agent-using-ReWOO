@@ -1,6 +1,7 @@
 import { useState } from "react";
 import PropTypes from "prop-types";
 import { Button, MarkdownRenderer } from "../ui";
+import { ProjectSpecForm } from "../forms";
 import "./ReviewStep.css";
 
 export const ReviewStep = ({
@@ -11,6 +12,11 @@ export const ReviewStep = ({
   onGeneratePlan,
 }) => {
   const [feedback, setFeedback] = useState("");
+  const [projectSpec, setProjectSpec] = useState(null);
+
+  const handleSpecChange = (updatedSpec) => {
+    setProjectSpec(updatedSpec);
+  };
 
   return (
     <div className="step-container">
@@ -40,12 +46,19 @@ export const ReviewStep = ({
         )}
       </div>
 
+      {/* Project Specification Form */}
+      <ProjectSpecForm onSpecChange={handleSpecChange} />
+
       <div className="feedback-section">
-        <h3>Provide Feedback (Optional)</h3>
+        <h3>Additional Feedback (Optional)</h3>
+        <p className="feedback-hint">
+          Add any additional comments or concerns about the feasibility
+          assessment.
+        </p>
         <textarea
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
-          placeholder="Add any comments or concerns about the feasibility assessment..."
+          placeholder="E.g., 'Focus more on security requirements' or 'Add mobile app considerations'..."
           className="feedback-textarea"
           rows={4}
         />

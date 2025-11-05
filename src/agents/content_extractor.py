@@ -204,16 +204,47 @@ class ContentExtractorAgent:
             else:
                 raise ValueError("No JSON found in response")
             
-            # Create ExtractedContent object
+            # Create ExtractedContent object with type validation
+            # Ensure technical_details is a dict (LLM sometimes returns list)
+            technical_details_raw = data.get("technical_details", {})
+            if not isinstance(technical_details_raw, dict):
+                print(f"WARNING: technical_details is {type(technical_details_raw)}, converting to dict")
+                technical_details_raw = {}
+            
+            # Ensure list fields are actually lists (not dicts or other types)
+            requirements_raw = data.get("requirements", [])
+            if not isinstance(requirements_raw, list):
+                print(f"WARNING: requirements is {type(requirements_raw)}, converting to list")
+                requirements_raw = []
+            else:
+                # Filter out non-dict items from requirements list
+                requirements_raw = [req for req in requirements_raw if isinstance(req, dict)]
+            
+            features_raw = data.get("features", [])
+            if not isinstance(features_raw, list):
+                print(f"WARNING: features is {type(features_raw)}, converting to list")
+                features_raw = []
+            else:
+                # Filter out non-dict items from features list
+                features_raw = [feat for feat in features_raw if isinstance(feat, dict)]
+            
+            # Ensure extraction_confidence is a float (LLM sometimes returns string)
+            extraction_confidence_raw = data.get("extraction_confidence", 0.5)
+            try:
+                extraction_confidence = float(extraction_confidence_raw)
+            except (ValueError, TypeError):
+                print(f"WARNING: extraction_confidence is {type(extraction_confidence_raw)}, using default 0.5")
+                extraction_confidence = 0.5
+            
             extracted = ExtractedContent(
                 filename=classification.filename,
                 document_type=classification.document_type,
                 title=data.get("title"),
                 summary=data.get("summary"),
                 key_sections=data.get("key_sections", []),
-                requirements=data.get("requirements", []),
-                features=data.get("features", []),
-                technical_details=data.get("technical_details", {}),
+                requirements=requirements_raw,
+                features=features_raw,
+                technical_details=technical_details_raw,
                 test_cases=data.get("test_cases", []),
                 use_cases=data.get("use_cases", []),
                 risks=data.get("risks", []),
@@ -224,7 +255,7 @@ class ContentExtractorAgent:
                 stakeholders=data.get("stakeholders", []),
                 systems=data.get("systems", []),
                 keywords=data.get("keywords", []),
-                extraction_confidence=data.get("extraction_confidence", 0.5),
+                extraction_confidence=extraction_confidence,
                 extraction_notes=data.get("extraction_notes", [])
             )
             
