@@ -1,1 +1,56 @@
 /* Development process step styles are inherited from App.css */
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  gap: 2rem;
+}
+
+.step-header > div {
+  flex: 1;
+}
+
+.test-data-toggle {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.test-data-toggle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.test-data-toggle.active {
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+}
+
+.test-data-toggle.active:hover {
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+}
+
+@media (max-width: 768px) {
+  .step-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .test-data-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+}
