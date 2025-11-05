@@ -20,9 +20,10 @@ env/
 # Lock files
 *.lock
 
-# Data directory
+# Data 
 data/
 !data/files
+qdrant_storage/
 
 # Outputs
 outputs/
@@ -30,3 +31,6 @@ output/
 
 # cache
 cache/
+
+# Vite
+.vite/
