@@ -125,3 +125,45 @@ async def get_file_content(file_path: str = Query(..., description="Path to the 
             status_code=500,
             detail=f"Error reading file: {str(e)}"
         )
+
+
+# Get upload/processing status (for frontend polling)
+@router.get("/upload-status/{session_id}")
+async def get_upload_status(session_id: str):
+    """
+    Get the upload and processing status for a session.
+    Used by frontend for polling during async document processing.
+    
+    Returns:
+        - status: "processing" | "completed" | "failed"
+        - message: Human-readable status message
+        - parsed_documents: Number of documents parsed (if available)
+    """
+    # Debug logging
+    print(f"[DEBUG] Status check for session: {session_id}")
+    print(f"[DEBUG] Available sessions: {list(sessions.keys())}")
+    
+    session = sessions.get(session_id)
+    if not session:
+        print(f"[DEBUG] Session {session_id} not found!")
+        raise HTTPException(
+            status_code=404,
+            detail="Session not found. Please upload documents first."
+        )
+    
+    # Get status from session
+    status = session.processing_status or "unknown"
+    message = session.status_message or "Processing..."
+    
+    # Build response
+    response = {
+        "status": status,
+        "message": message,
+        "session_id": session_id,
+    }
+    
+    # Add optional details if available
+    if session.parsed_documents:
+        response["parsed_documents"] = len(session.parsed_documents)
+    
+    return response

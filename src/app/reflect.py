@@ -15,7 +15,7 @@ def generate_reflection(state: ReflectionState) -> Dict[str, object]:
         raise ValueError("Cannot reflect without an existing draft.")
 
     prompt_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "prompts", "reflect_prompt.txt")
+        os.path.join(os.path.dirname(__file__), "..", "..", "prompts", "project_plan_reflect.txt")
     )
     prompt_template = load_prompt_template(prompt_path)
 
@@ -26,10 +26,10 @@ def generate_reflection(state: ReflectionState) -> Dict[str, object]:
     ) or "No feasibility notes supplied. Flag missing governance details."
 
     formatted_prompt = prompt_template.format(
-        task=state.task or "Create a comprehensive software project plan.",
-        feasibility_context=feasibility_context,
-        document_context=state.document_context or "Document context unavailable.",
-        current_draft=state.current_draft,
+        pm_inputs=state.task or "Create a comprehensive software project plan.",
+        feasibility_report=feasibility_context,
+        initial_documents=state.document_context or "Document context unavailable.",
+        draft_project_plan=state.current_draft,
     )
 
     result = model.invoke(formatted_prompt)

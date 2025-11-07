@@ -1,7 +1,7 @@
 """
 Upload Handler
 
-Handles file upload logic, validation, and RAG pipeline integration.
+Handles file upload logic, validation, and document parsing.
 """
 
 from typing import List, Optional
@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import uuid
 from datetime import datetime
+import threading
 
 from fastapi import HTTPException, UploadFile
 
@@ -25,19 +26,17 @@ class UploadHandler:
     1. Validate uploaded files or use default files
     2. Save to data/uploads/ (if uploaded)
     3. Create session and store file paths
-    4. Trigger RAG pipeline (parse + embed)
+    4. Parse documents to markdown and JSON
     5. Return upload statistics
     """
     
-    def __init__(self, enable_rag: bool = True, verbose: bool = False):
+    def __init__(self, verbose: bool = False):
         """
         Initialize upload handler.
         
         Args:
-            enable_rag: Enable automatic RAG processing
             verbose: Enable verbose console output
         """
-        self.enable_rag = enable_rag
         self.verbose = verbose
     
     async def handle_upload(
@@ -46,7 +45,7 @@ class UploadHandler:
         files: Optional[List[UploadFile]] = None
     ) -> dict:
         """
-        Handle file upload and RAG processing.
+        Handle file upload and document parsing.
         
         Args:
             use_default_files: Use default files from data/files/
@@ -60,6 +59,62 @@ class UploadHandler:
         print(f"Created new session: {session_id}")
         session = Session(session_id)
         
+        # ============================================================
+        # HARDCODED SESSION MODE (Fast path for development/testing)
+        # ============================================================
+        from src.config.feature_flags import feature_flags
+        
+        if feature_flags.use_hardcoded_session and use_default_files:
+            print("\n" + "="*80)
+            print("HARDCODED SESSION MODE ENABLED")
+            print("Using pre-processed files")
+            print("="*80 + "\n")
+            
+            try:
+                # Create mock ParsedDocument objects
+                class MockParsedDoc:
+                    def __init__(self, md_path):
+                        self.source_pdf = f"data/files/{md_path.stem}.pdf"
+                        self.output_md_path = str(md_path)
+                
+                # Get MD files from hardcoded directory
+                md_dir = Path(feature_flags.hardcoded_md_dir)
+                md_files = sorted(md_dir.glob("*.md"))
+                
+                if not md_files:
+                    raise Exception(f"No MD files found in {md_dir}")
+                
+                session.parsed_documents = [MockParsedDoc(md) for md in md_files]
+                session.parsed_documents_dir = str(md_dir)
+                session.json_documents_dir = feature_flags.hardcoded_json_dir
+                
+                # Set completed status
+                session.processing_status = "completed"
+                session.status_message = f"Hardcoded session ready ({len(md_files)} docs)"
+                
+                # Store session
+                sessions[session_id] = session
+                
+                print(f"Hardcoded session created: {session_id}")
+                print(f"  MD files: {len(md_files)}")
+                print(f"  JSON dir: {session.json_documents_dir}\n")
+                
+                return {
+                    "session_id": session_id,
+                    "message": session.status_message,
+                    "uploaded_files": [doc.source_pdf.split('/')[-1] for doc in session.parsed_documents],
+                    "total_files": len(session.parsed_documents),
+                    "status": "completed"
+                }
+                
+            except Exception as e:
+                print(f"Hardcoded session failed: {e}")
+                print("Falling back to normal pipeline...\n")
+                # Continue to normal pipeline below
+        
+        # ============================================================
+        # NORMAL PIPELINE (Full processing)
+        # ============================================================
         uploaded_files = []
         
         try:
@@ -135,29 +190,24 @@ class UploadHandler:
             sessions[session_id] = session
             print(f"Session {session_id} stored with {len(uploaded_files)} files")
             
-            # Process documents SYNCHRONOUSLY - no background thread
-            # The upload request will wait until all processing is complete
-            if self.enable_rag:
-                print(f"\n🚀 Starting SYNCHRONOUS document processing...")
-                print(f"   This will take 3-5 minutes - request will wait until complete\n")
-                
-                # Set status to processing
-                session.processing_status = "processing"
-                session.status_message = "Processing documents..."
-                
-                # Process synchronously (blocks until complete)
-                self._process_with_rag_sync(session, uploaded_files)
-                
-                # After processing, check final status
-                if session.processing_status == "completed":
-                    message = session.status_message
-                else:
-                    # Processing failed
-                    message = f"Processing failed: {session.processing_error or 'Unknown error'}"
-            else:
-                session.processing_status = "completed"
-                message = f"Uploaded {len(uploaded_files)} files. RAG processing disabled."
+            # Process documents SYNCHRONOUSLY (blocking)
+            print(f"\n🚀 Starting document processing (parsing only)...")
+            print(f"   This will block until complete (30-60 seconds with cache)\n")
             
+            # Set status to processing
+            session.processing_status = "processing"
+            session.status_message = "Processing documents..."
+            
+            # Process synchronously (BLOCKS until complete)
+            self._process_documents_sync(session, uploaded_files)
+            
+            # After processing completes, check status
+            if session.processing_status == "completed":
+                message = session.status_message
+            else:
+                message = f"Processing failed: {session.processing_error or 'Unknown error'}"
+            
+            # Return after processing completes
             return {
                 "session_id": session_id,
                 "message": message,
@@ -181,15 +231,15 @@ class UploadHandler:
                 detail=f"Error during file upload: {str(e)}"
             )
     
-    def _process_with_rag_sync(self, session: Session, uploaded_files: List[str]) -> None:
+    def _process_documents_sync(self, session: Session, uploaded_files: List[str]) -> None:
         """
-        Process documents with clean separation: Parse → Embed → Ready
+        Process documents: Parse → Convert → Ready
         Updates session status upon completion or failure.
         
         Workflow:
-            1. Parse PDFs → Markdown files (ParsingHandler)
-            2. Embed MD files → Qdrant (EmbeddingHandler)
-            3. Ready for manual input (feasibility questions)
+            1. Parse PDFs → Markdown files (DoclingParser)
+            2. Convert Markdown → JSON (LLM-based)
+            3. Ready for feasibility questions and plan generation
         
         Args:
             session: Session object
@@ -235,7 +285,7 @@ class UploadHandler:
             # STEP 1.5: CONVERT Markdown → JSON (LLM-based)
             # ========================================
             # CRITICAL: This runs SYNCHRONOUSLY to ensure JSON files are ready
-            # before proceeding to embedding and marking session as complete.
+            # before marking session as complete.
             print(f"\n{'='*80}")
             print(f"📊 STEP 1.5: Converting Markdown to JSON using LLM...")
             print(f"⚠️  This step runs synchronously and blocks until complete.")
@@ -286,67 +336,16 @@ class UploadHandler:
                 session.json_conversion_log = {"status": "disabled"}
             
             # ========================================
-            # STEP 2: EMBED Markdown → Qdrant
-            # ========================================
-            # NOTE: This step runs SYNCHRONOUSLY after JSON conversion
-            # The pipeline is: Parse → JSON → Embed (all in sequence)
-            print(f"\n{'='*80}")
-            print(f"🧠 STEP 2: Embedding Markdown files to Qdrant...")
-            print(f"⚠️  This step runs synchronously - no race conditions!")
-            print(f"-" * 80)
-            
-            from src.core.embedding_handler import EmbeddingHandler
-            from src.config.feature_flags import feature_flags
-            
-            embedding_handler = EmbeddingHandler(
-                session_id=session.session_id,
-                qdrant_url=feature_flags.qdrant_url,
-                embedding_model=(
-                    feature_flags.gemini_embedding_model 
-                    if feature_flags.embedding_provider == "gemini" 
-                    else feature_flags.embedding_model
-                ),
-                embedding_provider=feature_flags.embedding_provider,
-                chunk_size=feature_flags.max_chunk_size,
-                chunk_overlap=feature_flags.chunk_overlap,
-                verbose=True
-            )
-            
-            embedding_result = embedding_handler.embed_documents(
-                parsed_documents=parsed_documents,
-                cached_documents_info=[]  # Not needed with new simple parser
-            )
-            
-            qdrant_manager = embedding_result["qdrant_manager"]
-            qdrant_stats = embedding_result["qdrant_stats"]
-            collection_name = embedding_result["collection_name"]
-            
-            print(f"\n✅ Embedding Complete:")
-            print(f"   • Collection: {collection_name}")
-            print(f"   • Chunks created: {qdrant_stats.get('chunks_created', 0)}")
-            print(f"   • Chunks added: {qdrant_stats.get('chunks_added', 0)}")
-            
-            # ========================================
-            # STEP 3: Store Results in Session
+            # STEP 2: Store Results in Session
             # ========================================
             session.parsed_documents = parsed_documents
             session.parsed_documents_dir = parsing_result["md_directory"]
-            session.qdrant_manager = qdrant_manager
-            session.qdrant_collection_name = collection_name
             session.parsing_log_path = parsing_result["parsing_log_path"]
-            
-            # Build embedding cache stats for compatibility
-            session.embedding_cache_stats = {
-                "session_cache_hits": cache_hits,
-                "session_cache_misses": cache_misses,
-                "total_chunks_created": qdrant_stats.get('chunks_created', 0)
-            }
             
             # Update session status to completed
             # CRITICAL: Only set to "completed" after ALL steps are done:
             # - Parsing (PDF → MD)
-            # - JSON Conversion (MD → JSON) 
-            # - Embedding (MD → Qdrant)
+            # - JSON Conversion (MD → JSON)
             session.processing_status = "completed"
             
             json_status = ""
@@ -356,9 +355,8 @@ class UploadHandler:
             
             session.status_message = (
                 f"✅ Successfully processed {len(uploaded_files)} files. "
-                f"Created {len(parsed_documents)} MD files, "
+                f"Created {len(parsed_documents)} MD files. "
                 f"{json_status}"
-                f"{qdrant_stats.get('chunks_added', 0)} embeddings. "
                 f"Ready for feasibility questions and plan generation!"
             )
             
@@ -367,9 +365,7 @@ class UploadHandler:
             print(f"{'='*80}")
             print(f"   Session ID: {session.session_id}")
             print(f"   MD Files: {len(parsed_documents)}")
-            print(f"   Embeddings: {qdrant_stats.get('chunks_added', 0)}")
-            print(f"   Collection: {collection_name}")
-            print(f"   Status: Ready for manual input (feasibility questions)")
+            print(f"   Status: Ready for feasibility questions and plan generation")
             print(f"{'='*80}\n")
             
         except Exception as e:

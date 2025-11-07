@@ -20,7 +20,7 @@ def generate_draft(state: ReflectionState) -> Dict[str, object]:
     """Generate the next project plan draft using contextual inputs."""
 
     prompt_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "prompts", "draft_prompt.txt")
+        os.path.join(os.path.dirname(__file__), "..", "..", "prompts", "project_plan_draft.txt")
     )
     prompt_template = load_prompt_template(prompt_path)
 
@@ -41,9 +41,9 @@ def generate_draft(state: ReflectionState) -> Dict[str, object]:
     revision_guidance = state.revision_instructions or "None. Produce the strongest possible initial plan."
 
     formatted_prompt = prompt_template.format(
-        task=(state.task or DEFAULT_TASK_PLACEHOLDER),
-        feasibility_context=feasibility_context,
-        document_context=document_context,
+        pm_inputs=(state.task or DEFAULT_TASK_PLACEHOLDER),
+        feasibility_report=feasibility_context,
+        initial_documents=document_context,
         revision_guidance=revision_guidance,
     )
 

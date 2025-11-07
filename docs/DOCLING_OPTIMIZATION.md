@@ -79,7 +79,7 @@ ParsingHandler(
 ### 4. **Caching** ✅ (Implemented)
 
 **Global cache** avoids re-parsing the same PDFs:
-- Cache location: `data/embedding_cache/`
+- Cache location: `data/parsing_cache/`
 - Cache key: SHA-256 hash of PDF file
 
 **How to use**:
@@ -317,7 +317,7 @@ ParsingHandler(
 ## 🚀 Next Steps
 
 1. ✅ Monitor first parsing run (use terminal logs)
-2. ✅ Verify cache is working (check `data/embedding_cache/`)
+2. ✅ Verify cache is working (check `data/parsing_cache/`)
 3. ✅ Adjust settings based on your document types
 4. ⚠️ Consider GPU acceleration for high-volume workloads
 5. ⚠️ Implement parallel processing if you have sufficient RAM

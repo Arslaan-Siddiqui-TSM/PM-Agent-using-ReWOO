@@ -92,14 +92,23 @@ class FeasibilityHandler:
             else:
                 print("No development context provided. Proceeding without development process information.")
             
-            # Step 2: Generate feasibility assessment using LLM (v3 with JSON input)
-            print("Step 2: Generating feasibility assessment with LLM (using v3 prompt)")
-            feasibility_result = self._generate_with_retry(
-                docs_text,
-                development_context,
-                session.session_id,
-                md_file_paths=md_file_paths
-            )
+            # Step 2: Generate feasibility assessment
+            from src.config.feature_flags import feature_flags
+            
+            if feature_flags.use_hardcoded_feasibility:
+                print("\n" + "="*80)
+                print("HARDCODED FEASIBILITY MODE: Loading from static files")
+                print("Skipping LLM calls to save costs during development/testing")
+                print("="*80 + "\n")
+                feasibility_result = self._load_hardcoded_feasibility()
+            else:
+                print("Step 2: Generating feasibility assessment with LLM (using v3 prompt)")
+                feasibility_result = self._generate_with_retry(
+                    docs_text,
+                    development_context,
+                    session.session_id,
+                    md_file_paths=md_file_paths
+                )
             
             # Validate outputs
             self._validate_outputs(feasibility_result)
@@ -299,6 +308,51 @@ class FeasibilityHandler:
                 status_code=502,
                 detail="LLM returned insufficient content for feasibility outputs. Please try again."
             )
+    
+    def _load_hardcoded_feasibility(self) -> Dict[str, str]:
+        """
+        Load hardcoded feasibility files instead of generating with LLM.
+        
+        This is used for fast development/testing to avoid expensive LLM calls.
+        Enable with USE_HARDCODED_FEASIBILITY=true in .env
+        
+        Returns:
+            Dictionary with 'thinking_summary' and 'feasibility_report' keys
+        """
+        from src.config.feature_flags import feature_flags
+        from pathlib import Path
+        
+        thinking_file = Path(feature_flags.hardcoded_feasibility_thinking_file)
+        report_file = Path(feature_flags.hardcoded_feasibility_report_file)
+        
+        print(f"Loading hardcoded thinking summary from: {thinking_file}")
+        if not thinking_file.exists():
+            raise FileNotFoundError(
+                f"Hardcoded thinking summary file not found: {thinking_file}\n"
+                f"Please ensure the file exists or disable USE_HARDCODED_FEASIBILITY"
+            )
+        
+        print(f"Loading hardcoded feasibility report from: {report_file}")
+        if not report_file.exists():
+            raise FileNotFoundError(
+                f"Hardcoded feasibility report file not found: {report_file}\n"
+                f"Please ensure the file exists or disable USE_HARDCODED_FEASIBILITY"
+            )
+        
+        # Read files
+        with open(thinking_file, 'r', encoding='utf-8') as f:
+            thinking_summary = f.read()
+        
+        with open(report_file, 'r', encoding='utf-8') as f:
+            feasibility_report = f.read()
+        
+        print(f"Loaded thinking summary: {len(thinking_summary)} chars")
+        print(f"Loaded feasibility report: {len(feasibility_report)} chars")
+        
+        return {
+            "thinking_summary": thinking_summary,
+            "feasibility_report": feasibility_report
+        }
     
     def _save_feasibility_files(
         self,

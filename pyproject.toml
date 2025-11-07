@@ -15,10 +15,9 @@ dependencies = [
     "python-multipart>=0.0.20",
     "rich>=14.2.0",
     "langchain-docling>=1.1.0",
-    "openai>=2.6.1",
     "langchain-openai>=0.3.35",
+    "langchain-nvidia-ai-endpoints>=0.3.0",
     "unstructured>=0.18.15",
-    "langchain-qdrant>=0.2.1",
 ]
 
 [tool.uv.workspace]
