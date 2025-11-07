@@ -29,21 +29,7 @@ class UploadResponse(BaseModel):
     message: str
     uploaded_files: List[str]
     total_files: int
-
-
-class GenerateEmbeddingsRequest(BaseModel):
-    session_id: str = Field(..., description="Session ID from upload response")
-    force_reprocess: bool = Field(False, description="Force re-parsing and re-embedding (bypass cache)")
-
-
-class GenerateEmbeddingsResponse(BaseModel):
-    session_id: str
-    collection_name: str
-    chunks_stored: int
-    cache_hits: int
-    cache_misses: int
-    processing_time: float
-    parsing_log: str
+    status: str
 
 
 class FeasibilityRequest(BaseModel):
@@ -90,14 +76,15 @@ async def upload_documents(
     
     Note: Processing happens in background. Use /upload-status/{session_id} to check progress.
     """
-    handler = UploadHandler(enable_rag=True, verbose=False)
+    handler = UploadHandler(verbose=False)
     result = await handler.handle_upload(use_default_files=use_default_files, files=files)
     
     return UploadResponse(
         session_id=result["session_id"],
         message=result["message"],
         uploaded_files=result["uploaded_files"],
-        total_files=result["total_files"]
+        total_files=result["total_files"],
+        status=result["status"]
     )
 
 
@@ -110,7 +97,6 @@ async def check_upload_status(session_id: str):
         - status: pending/processing/completed/failed
         - message: Status message with details
         - parsed_documents: Number of documents parsed (if completed)
-        - chunks_created: Number of vector embeddings created (if completed)
     """
     session = sessions.get(session_id)
     if not session:
@@ -129,11 +115,6 @@ async def check_upload_status(session_id: str):
     # Add detailed info if processing is completed
     if session.processing_status == "completed" and session.parsed_documents:
         response["parsed_documents"] = len(session.parsed_documents)
-        if session.embedding_cache_stats:
-            response["chunks_created"] = session.embedding_cache_stats.get("session_cache_misses", 0)
-            response["cache_hits"] = session.embedding_cache_stats.get("session_cache_hits", 0)
-        if session.qdrant_collection_name:
-            response["qdrant_collection"] = session.qdrant_collection_name
     
     # Add error details if processing failed
     if session.processing_status == "failed" and session.processing_error:
@@ -143,118 +124,7 @@ async def check_upload_status(session_id: str):
 
 
 # ============================================================================
-# Endpoint 2: Generate Embeddings (Manual RAG Processing)
-# ============================================================================
-
-@router.post("/generate-embeddings", response_model=GenerateEmbeddingsResponse)
-async def generate_embeddings(request: GenerateEmbeddingsRequest):
-    """
-    Manually trigger or force re-generate embeddings for a session's documents.
-    Useful for:
-    - Re-processing documents with updated settings
-    - Force bypassing cache
-    - Regenerating embeddings after errors
-    
-    The upload endpoint already processes embeddings automatically,
-    so this is only needed for special cases.
-    """
-    print(f"Generate embeddings requested for session: {request.session_id}")
-    start_time = time.time()
-    
-    # Get session
-    session = sessions.get(request.session_id)
-    if not session:
-        print(f"Session not found: {request.session_id}")
-        raise HTTPException(
-            status_code=404,
-            detail="Session not found. Please upload documents first."
-        )
-    
-    if session.is_expired():
-        print(f"Session expired: {request.session_id}")
-        raise HTTPException(
-            status_code=410,
-            detail="Session expired. Please upload documents again."
-        )
-    
-    if not session.document_paths:
-        raise HTTPException(
-            status_code=400,
-            detail="No documents found in session. Please upload documents first."
-        )
-    
-    try:
-        print(f"Processing {len(session.document_paths)} documents with force_reprocess={request.force_reprocess}")
-        
-        # STEP 1: Parse PDFs → MD files
-        from src.core.docling_parser import DoclingParser
-        parser = DoclingParser(
-            session_id=request.session_id,
-            output_dir="output",
-            ocr_enabled=True,  # OCR for scanned documents
-            table_mode="fast",  # Fast mode: 20-30s per PDF
-            enable_cache=True
-        )
-        parsing_result = parser.parse_pdfs(
-            pdf_paths=session.document_paths,
-            force_reparse=request.force_reprocess
-        )
-        
-        # STEP 2: Embed MD files → Qdrant
-        from src.core.embedding_handler import EmbeddingHandler
-        from src.config.feature_flags import feature_flags
-        
-        embedding_handler = EmbeddingHandler(
-            session_id=request.session_id,
-            qdrant_url=feature_flags.qdrant_url,
-            embedding_model=(
-                feature_flags.gemini_embedding_model 
-                if feature_flags.embedding_provider == "gemini" 
-                else feature_flags.embedding_model
-            ),
-            embedding_provider=feature_flags.embedding_provider,
-            chunk_size=feature_flags.max_chunk_size,
-            chunk_overlap=feature_flags.chunk_overlap,
-            verbose=True
-        )
-        embedding_result = embedding_handler.embed_documents(
-            parsed_documents=parsing_result["parsed_documents"],
-            cached_documents_info=[]  # Not needed with new simple parser
-        )
-        
-        # Update session
-        session.parsed_documents = parsing_result["parsed_documents"]
-        session.qdrant_manager = embedding_result["qdrant_manager"]
-        session.qdrant_collection_name = embedding_result["qdrant_collection_name"]
-        session.embedding_cache_stats = embedding_result["cache_stats"]
-        session.parsing_log_path = parsing_result["parsing_log_path"]
-        
-        execution_time = time.time() - start_time
-        
-        print(f"Embedding generation complete in {execution_time:.2f}s")
-        print(f"  - Collection: {embedding_result['qdrant_collection_name']}")
-        print(f"  - Chunks: {embedding_result['chunks_added']}")
-        print(f"  - Cache hits: {embedding_result['cache_stats'].get('session_cache_hits', 0)}")
-        
-        return GenerateEmbeddingsResponse(
-            session_id=request.session_id,
-            collection_name=embedding_result["qdrant_collection_name"],
-            chunks_stored=embedding_result["chunks_added"],
-            cache_hits=embedding_result["cache_stats"].get("session_cache_hits", 0),
-            cache_misses=embedding_result["cache_stats"].get("session_cache_misses", 0),
-            processing_time=execution_time,
-            parsing_log=parsing_result["parsing_log_path"]
-        )
-    except Exception as e:
-        print(f"Error during embedding generation for session {request.session_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error during embedding generation: {str(e)}"
-        )
-
-
-# ============================================================================
-# Endpoint 3: Feasibility Check
+# Endpoint 2: Feasibility Check
 # ============================================================================
 
 @router.post("/feasibility")
@@ -264,8 +134,8 @@ async def check_feasibility(request: FeasibilityRequest):
     Just provide the session_id from upload - no file paths needed!
     Returns the feasibility assessment in markdown format.
     
-    IMPORTANT: This endpoint requires that document processing (parsing, JSON conversion, 
-    and embedding) is fully complete before feasibility generation can proceed.
+    IMPORTANT: This endpoint requires that document processing (parsing and JSON conversion) 
+    is fully complete before feasibility generation can proceed.
     """
     # Get session
     session = sessions.get(request.session_id)
@@ -292,7 +162,7 @@ async def check_feasibility(request: FeasibilityRequest):
                 status_code=425,  # Too Early
                 detail=(
                     "Document processing is still in progress. "
-                    "Please wait for parsing, JSON conversion, and embedding to complete. "
+                    "Please wait for parsing and JSON conversion to complete. "
                     "Use /upload-status/{session_id} to check progress."
                 )
             )
@@ -311,11 +181,11 @@ async def check_feasibility(request: FeasibilityRequest):
             )
     
     # Validate required session data is present
-    if not session.parsed_documents or not session.qdrant_manager:
+    if not session.parsed_documents:
         print(f"Session {request.session_id} marked complete but missing required data")
         raise HTTPException(
             status_code=500,
-            detail="Session processing incomplete: missing parsed documents or embeddings. Please re-upload documents."
+            detail="Session processing incomplete: missing parsed documents. Please re-upload documents."
         )
     
     print(f"✅ All processing complete for session {request.session_id}, proceeding with feasibility generation")
@@ -331,7 +201,7 @@ async def check_feasibility(request: FeasibilityRequest):
 
 
 # ============================================================================
-# Endpoint 4: Generate Full Plan
+# Endpoint 3: Generate Full Plan
 # ============================================================================
 
 @router.post("/generate-plan", response_model=GeneratePlanResponse)
@@ -340,8 +210,8 @@ async def generate_plan(request: GeneratePlanRequest):
     Generate a complete project plan based on the uploaded documents.
     Just provide the session_id - the system remembers your documents!
     
-    IMPORTANT: This endpoint requires that document processing (parsing, JSON conversion, 
-    and embedding) is fully complete before plan generation can proceed.
+    IMPORTANT: This endpoint requires that document processing (parsing and JSON conversion) 
+    is fully complete before plan generation can proceed.
     """
     # Get session
     session = sessions.get(request.session_id)
@@ -368,7 +238,7 @@ async def generate_plan(request: GeneratePlanRequest):
                 status_code=425,  # Too Early
                 detail=(
                     "Document processing is still in progress. "
-                    "Please wait for parsing, JSON conversion, and embedding to complete. "
+                    "Please wait for parsing and JSON conversion to complete. "
                     "Use /upload-status/{session_id} to check progress."
                 )
             )
@@ -387,11 +257,11 @@ async def generate_plan(request: GeneratePlanRequest):
             )
     
     # Validate required session data is present
-    if not session.parsed_documents or not session.qdrant_manager:
+    if not session.parsed_documents:
         print(f"Session {request.session_id} marked complete but missing required data")
         raise HTTPException(
             status_code=500,
-            detail="Session processing incomplete: missing parsed documents or embeddings. Please re-upload documents."
+            detail="Session processing incomplete: missing parsed documents. Please re-upload documents."
         )
     
     print(f"✅ All processing complete for session {request.session_id}, proceeding with plan generation")

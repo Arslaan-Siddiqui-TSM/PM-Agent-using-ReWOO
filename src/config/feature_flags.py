@@ -21,28 +21,25 @@ class FeatureFlags(BaseSettings):
     kroki_url: str = "https://kroki.io"
     enable_diagram_generation: bool = False  # Opt-in feature
     
-    # Advanced features (opt-in)
-    enable_rag: bool = False  # RAG-powered document querying
-    enable_chat: bool = False  # Conversational plan refinement
-    enable_validation: bool = False  # Plan validation agent
-    
     # Performance settings
     max_file_size_mb: int = 50  # Maximum file size for upload
     parallel_workers: int = 4  # Thread pool size for CPU-bound tasks
-    
-    # RAG/Embedding configuration (if enabled)
-    embedding_provider: str = "openai"  # "openai" or "gemini"
-    embedding_model: str = "text-embedding-3-large"  # OpenAI embedding model
-    gemini_embedding_model: str = "models/text-embedding-004"  # Gemini embedding model
-    qdrant_url: str = "http://localhost:6333"  # Qdrant server URL
-    qdrant_collection_prefix: str = "pm_agent"  # Collection name prefix
-    max_chunk_size: int = 1000  # Chunk size for RAG
-    chunk_overlap: int = 200  # Overlap between chunks
     
     # Intelligent parsing configuration
     use_intelligent_parsing: bool = True  # Enable intelligent parser routing
     parsing_complexity_threshold: float = 0.3  # Complexity threshold (0.0-1.0)
     force_docling: bool = False  # Force Docling for all docs (debugging)
+    
+    # Hardcoded session mode (for fast development/testing)
+    use_hardcoded_session: bool = False
+    hardcoded_collection: str = "pm_agent_468e90d3"
+    hardcoded_md_dir: str = "data/hardcoded_session/markdown"
+    hardcoded_json_dir: str = "data/hardcoded_session/json"
+    
+    # Hardcoded feasibility mode (skip LLM calls for development/testing)
+    use_hardcoded_feasibility: bool = False
+    hardcoded_feasibility_thinking_file: str = "data/hardcoded_session/thinking_summary.md"
+    hardcoded_feasibility_report_file: str = "data/hardcoded_session/feasibility_report.md"
     
     class Config:
         env_file = ".env"
@@ -53,7 +50,3 @@ class FeatureFlags(BaseSettings):
 
 # Global instance
 feature_flags = FeatureFlags()
-
-
-
-

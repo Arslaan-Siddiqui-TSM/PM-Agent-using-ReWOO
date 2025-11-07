@@ -16,28 +16,68 @@ Quick, simple, and local-friendly.
 - Python 3.13+
 - Node.js 18+ (for the frontend)
 - Docker (for Qdrant)
-- API keys:
-  - OpenAI or Google Gemini: for the LLM (choose via `LLM_PROVIDER` env var)
-  - OpenAI or Google Gemini: for embeddings (choose via `EMBEDDING_PROVIDER` env var)
+- API keys (choose one or more):
+  - **NVIDIA NIM**: for both LLM and embeddings (recommended - get key from [build.nvidia.com](https://build.nvidia.com/))
+  - **OpenAI**: for both LLM and embeddings (get key from [platform.openai.com](https://platform.openai.com/api-keys))
+  - **Google Gemini**: for both LLM and embeddings (get key from [aistudio.google.com](https://aistudio.google.com/app/apikey))
 
-Note: You can mix and match providers! For example: use Gemini for LLM and OpenAI for embeddings, or vice versa.
+Note: You can configure multiple providers for **automatic fallback**! If your primary provider fails (rate limit, API key issue, etc.), the system automatically tries the next available provider.
 
 ## Setup (Windows cmd)
 
-1. Clone and create your environment file
+1. Create your environment file
 
-```cmd
-copy .env.example .env
+Create a `.env` file in the project root with your API keys. **Choose one of these configurations:**
+
+### Option A: NVIDIA NIM (Recommended)
+```env
+# Primary LLM Provider
+LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-your-key-here
+NVIDIA_MODEL=qwen3-next-80b-a3b-instruct
+
+# Embedding Provider
+EMBEDDING_PROVIDER=nvidia
+NVIDIA_EMBEDDING_MODEL=llama-3.2-nemoretriever-1b-vlm-embed-v1
+
+# Optional: Add fallback providers (automatic failover)
+OPENAI_API_KEY=sk-your-key-here
+GOOGLE_API_KEY=your-google-key-here
+
+# Other required keys
+TAVILY_API_KEY=tvly-your-key-here
 ```
 
-Open `.env` and set at least:
-
+### Option B: OpenAI
 ```env
-OPENAI_API_KEY=sk-...
-GOOGLE_API_KEY=...
-TAVILY_API_KEY=...
-LLM_PROVIDER=openai          # or gemini (for chat/reasoning)
-EMBEDDING_PROVIDER=openai    # or gemini (for vector embeddings)
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o-mini
+
+EMBEDDING_PROVIDER=openai
+TAVILY_API_KEY=tvly-your-key-here
+```
+
+### Option C: Google Gemini
+```env
+LLM_PROVIDER=gemini
+GOOGLE_API_KEY=your-google-key-here
+GEMINI_MODEL=gemini-2.5-pro
+
+EMBEDDING_PROVIDER=gemini
+TAVILY_API_KEY=tvly-your-key-here
+```
+
+### Option D: Multi-Provider with Fallback
+```env
+# Primary: NVIDIA, Fallback: OpenAI → Gemini
+LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-your-key-here
+OPENAI_API_KEY=sk-your-key-here
+GOOGLE_API_KEY=your-google-key-here
+
+EMBEDDING_PROVIDER=nvidia
+TAVILY_API_KEY=tvly-your-key-here
 ```
 
 2. Start Qdrant (vector DB)
@@ -115,10 +155,25 @@ Outputs are saved under `outputs/` (feasibility report and final plan markdown f
 
 ## Troubleshooting
 
-- Qdrant connection failed – ensure Docker is running: `docker compose up -d qdrant`
-- 401/invalid API key – check `OPENAI_API_KEY` (embeddings) and your chosen `LLM_PROVIDER` envs
-- Rate limits (429) – try again later or reduce iterations
-- Upload errors – only PDFs are accepted; max 15 files
+- **Qdrant connection failed** – ensure Docker is running: `docker compose up -d qdrant`
+- **401/invalid API key** – check API keys in `.env` for your chosen provider(s):
+  - NVIDIA: `NVIDIA_API_KEY`
+  - OpenAI: `OPENAI_API_KEY`
+  - Gemini: `GOOGLE_API_KEY`
+- **Rate limits (429)** – the system will automatically try fallback providers if configured, or try again later
+- **Upload errors** – only PDFs are accepted; max 15 files
+- **LLM initialization failed** – ensure at least one provider's API key is valid
+
+### Multi-Provider Fallback
+
+The system uses **pure LangChain ecosystem** (no OpenAI SDK) and automatically falls back to alternative providers if the primary fails:
+
+1. **Primary provider** (from `LLM_PROVIDER` env var) is tried first
+2. If it fails, the system tries **OpenAI** (if `OPENAI_API_KEY` is set)
+3. If that fails, tries **Gemini** (if `GOOGLE_API_KEY` is set)
+4. If that fails, tries **NVIDIA** (if `NVIDIA_API_KEY` is set)
+
+This ensures maximum reliability!
 
 ## More docs
 

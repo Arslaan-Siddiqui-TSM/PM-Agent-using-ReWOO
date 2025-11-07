@@ -48,7 +48,7 @@ if session.processing_status != "completed":
 Additional validation ensures required data exists:
 
 ```python
-if not session.parsed_documents or not session.qdrant_manager:
+if not session.parsed_documents:
     raise HTTPException(
         status_code=500,
         detail="Session processing incomplete..."
@@ -60,7 +60,7 @@ if not session.parsed_documents or not session.qdrant_manager:
 | Status | Description | Can Generate Feasibility? | Can Generate Plan? |
 |--------|-------------|---------------------------|-------------------|
 | `pending` | Upload received, not started | ❌ No | ❌ No |
-| `processing` | Parsing/JSON/Embedding in progress | ❌ No (returns 425) | ❌ No (returns 425) |
+| `processing` | Parsing/JSON conversion in progress | ❌ No (returns 425) | ❌ No (returns 425) |
 | `completed` | All steps finished successfully | ✅ Yes | ✅ Yes |
 | `failed` | Processing encountered error | ❌ No (returns 500) | ❌ No (returns 500) |
 
@@ -77,10 +77,8 @@ Response:
 {
   "session_id": "abc123...",
   "status": "completed",
-  "message": "✅ Successfully processed 6 files. Created 6 MD files, Converted 6 documents to JSON. 245 embeddings. Ready for feasibility questions and plan generation!",
-  "parsed_documents": 6,
-  "chunks_created": 245,
-  "qdrant_collection": "session_abc12345"
+  "message": "✅ Successfully processed 6 files. Created 6 MD files, Converted 6 documents to JSON. Ready for feasibility questions and plan generation!",
+  "parsed_documents": 6
 }
 ```
 

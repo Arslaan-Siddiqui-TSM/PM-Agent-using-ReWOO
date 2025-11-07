@@ -35,7 +35,7 @@ class ParsedDocument:
     file_path: str
     file_name: str
     markdown_content: str
-    text_content: str  # Plain text for embedding
+    text_content: str  # Plain text representation
     output_md_path: str
     metadata: dict
     parser_used: str = "docling"
@@ -81,7 +81,7 @@ class DoclingParser:
         self.session_dir = Path(output_dir) / f"session_{session_id[:8]}_{date_str}"
         self.raw_dir = self.session_dir / "raw"
         self.metadata_dir = self.session_dir / "metadata"
-        self.cache_dir = Path("data/embedding_cache")
+        self.cache_dir = Path("data/parsing_cache")
         
         # Create directories
         self.raw_dir.mkdir(parents=True, exist_ok=True)
@@ -280,14 +280,14 @@ class DoclingParser:
             logger.info(f"   ✅ Done in {processing_time:.1f}s ({num_pages} pages)")
             logger.info(f"      Output: {md_path.name}")
             
-            # Extract plain text from markdown for embedding
+            # Extract plain text from markdown
             text_content = self._markdown_to_text(markdown_content)
             
             return ParsedDocument(
                 file_path=str(path.absolute()),
                 file_name=path.name,
                 markdown_content=enhanced_markdown,
-                text_content=text_content,  # For embedding
+                text_content=text_content,  # Plain text
                 output_md_path=str(md_path),
                 metadata={
                     "source": path.name,
@@ -358,7 +358,7 @@ class DoclingParser:
         return filename[:200].strip()
     
     def _markdown_to_text(self, markdown: str) -> str:
-        """Convert markdown to plain text for embedding."""
+        """Convert markdown to plain text."""
         import re
         
         # Remove markdown headers

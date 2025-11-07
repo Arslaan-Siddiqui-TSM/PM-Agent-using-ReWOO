@@ -71,6 +71,7 @@ class LLMMarkdownToJsonConverter:
             provider=self.provider,
             openai_model=self.model if self.provider == "openai" else "gpt-4o-mini",
             gemini_model=self.model if self.provider in ("gemini", "google") else "gemini-1.5-flash",
+            nvidia_model=self.model if self.provider == "nvidia" else "qwen3-next-80b-a3b-instruct",
             max_output_tokens=16000  # Allow large JSON output
         )
     
@@ -399,6 +400,7 @@ def convert_markdown_to_json(
             "openai": "gpt-4o-mini",
             "gemini": "gemini-1.5-flash",
             "google": "gemini-1.5-flash",
+            "nvidia": "qwen3-next-80b-a3b-instruct",
             "anthropic": "claude-3-haiku-20240307"
         }
         model = os.getenv("CONVERTER_MODEL", default_models.get(provider, "gpt-4o-mini"))

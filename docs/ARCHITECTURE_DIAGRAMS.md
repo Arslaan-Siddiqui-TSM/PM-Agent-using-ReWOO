@@ -33,7 +33,7 @@ This reflects the current FastAPI-based API, Reflection planning workflow (draft
 │                     RAG / VECTOR STORE                      │
 │  • OpenAI embeddings (text-embedding-3-*)                   │
 │  • Qdrant (Docker) for vector storage                       │
-│  • EmbeddingCacheManager (copy cached points)               │
+│  • Parsing cache (SHA256-based deduplication)               │
 └─────────────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -64,14 +64,14 @@ This reflects the current FastAPI-based API, Reflection planning workflow (draft
 │ DocumentIntelligencePipeline                │
 │  - Classifier / Extractor / Analyzer        │
 │  - IntelligentDocumentParser (Docling)      │
-│  - EmbeddingCacheManager (data/embedding_cache)
+│  - Parsing cache (data/parsing_cache)
 └───────────────┬────────────────────────────┘
                 │
                 ▼
 ┌───────────────────────────────┐   ┌─────────────────────────┐
-│ QdrantManager (vector store)  │   │ UnifiedLLM (provider)   │
-│  - Qdrant (6333/6334)         │   │  - OpenAI (o4-mini)     │
-│  - Collection: pm_agent_<id>  │   │  - Gemini (gemini-2.5)  │
+│ DoclingParser (PDF → MD)      │   │ UnifiedLLM (provider)   │
+│  - Parsing cache (SHA256)     │   │  - OpenAI (o4-mini)     │
+│  - Output: MD + JSON files    │   │  - Gemini (gemini-2.5)  │
 └───────────────────────────────┘   └─────────────────────────┘
                 │                            │
                 └──────────────┬─────────────┘
@@ -80,24 +80,22 @@ This reflects the current FastAPI-based API, Reflection planning workflow (draft
                      draft → critique → revise
 ```
 
-## Data Flow (including RAG path)
+## Data Flow
 
 ```
-PDFs (data/files or uploaded) → IntelligentDocumentParser
-     ├─ Pre-chunked (Docling HybridChunker) if available
-     └─ Fallback: RecursiveCharacterTextSplitter
+PDFs (data/files or uploaded) → DoclingParser
          │
          ▼
-Embeddings (OpenAI) → Qdrant (session collection)
+Markdown Files (.md) + JSON Files (.json)
          │
          ▼
-Classification → Extraction → Analysis (cached)
+Feasibility Assessment (optional) → LLM
          │
          ▼
-Planning Context (structured text) → Reflection Agent
+Project Plan → Reflection Agent
          │
          ▼
-Feasibility (optional) + Final Plan → outputs/*.md
+Final Plan → outputs/*.md
 ```
 
 ## Caching Strategy
@@ -108,17 +106,10 @@ Feasibility (optional) + Final Plan → outputs/*.md
    - extractions/{hash}.json
    - analysis/{set_hash}.json
 
-2) Embedding cache (data/embedding_cache/)
-   - Stores metadata per file hash:
-     • parsed_md_path
-     • qdrant_collection (usually pm_agent_cache)
-     • qdrant_point_ids (reused via copy)
-     • sessions_used_in [...]
-
-3) Session collection in Qdrant
-   - Name: pm_agent_<session_id[:8]>
-   - New parses are embedded and added
-   - Cached points copied into session collection for reuse
+2) Parsing cache (within DoclingParser)
+   - Avoids re-parsing same PDFs
+   - Uses SHA256 file hashing
+   - Stores parsed markdown files
 ```
 
 ## Runtime Components & Ports
@@ -126,7 +117,6 @@ Feasibility (optional) + Final Plan → outputs/*.md
 ```
 Frontend  : http://localhost:5173 (Vite dev server)
 Backend   : http://localhost:8000 (FastAPI)
-Qdrant    : http://localhost:6333 (REST), 6334 (gRPC)
 ```
 
 ## Decision Tree (Document Classification)
@@ -155,8 +145,7 @@ Inputs: classifications + extractions for all docs
 
 ```
 Input: requirements.pdf, tech-spec.pdf
-→ Pipeline: classify/extract/analyze (cached where possible)
-→ RAG: embed + store in Qdrant; copy cached points if available
+→ Parse: PDF → Markdown + JSON (cached where possible)
 → Feasibility: /api/feasibility saves two markdown files
 → Plan: /api/generate-plan saves project_plan_*.md
 ```
@@ -171,7 +160,7 @@ The planning flow uses a `ReflectionState` passed through the LangGraph:
 - iterations: collected iteration artifacts
 - final_plan: captured from the `revise` node
 
-Sessions are in-memory (`src/core/session_storage.py`); uploaded file paths, pipeline results, feasibility paths, and Qdrant info are stored per session id.
+Sessions are in-memory (`src/core/session_storage.py`); uploaded file paths, parsed documents, and feasibility paths are stored per session id.
 
 ## File Structure (relevant parts)
 
@@ -190,7 +179,7 @@ rewoo-demonstration/
 │  ├─ files/                     # sample PDFs
 │  ├─ uploads/                   # user uploads (runtime)
 │  ├─ parsed_documents/          # parser outputs
-│  └─ embedding_cache/           # embedding metadata cache
+│  └─ parsing_cache/             # parsing metadata cache
 ├─ outputs/                      # feasibility + plan markdown
 ├─ frontend/                     # React app (Vite)
 └─ docs/                         # this file + other docs

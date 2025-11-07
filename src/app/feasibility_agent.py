@@ -1,4 +1,5 @@
 import os
+import json
 import fitz
 from pathlib import Path
 from src.config.llm_config import model
@@ -8,6 +9,92 @@ from rich.text import Text
 
 
 console = Console()
+
+
+# ============================================================================
+# Helper Functions for Two-Stage Feasibility Generation
+# ============================================================================
+
+def _extract_thinking_summary(content_str: str) -> str:
+    """
+    Extract thinking summary from Stage 1 LLM response.
+    
+    Handles:
+    - Delimited format with ---THINKING_SUMMARY_START--- and ---THINKING_SUMMARY_END---
+    - Code fences around delimited content
+    - Fallback to entire content if delimiters not found
+    """
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Extracting thinking summary from Stage 1 response")
+    
+    # Optional: strip surrounding code fences if present
+    cs_strip = content_str.strip()
+    if cs_strip.startswith("```") and cs_strip.endswith("```"):
+        console.print("[bold yellow]DEBUG:[/bold yellow] Stripping surrounding code fences from response")
+        cs_body = cs_strip[3:]
+        nl = cs_body.find("\n")
+        if nl != -1:
+            cs_body = cs_body[nl+1:]
+        cs_body = cs_body.rstrip("`")
+        content_str = cs_body.strip()
+
+    # Try robust regex-based extraction
+    import re as _re
+    think_pat = _re.compile(
+        r"---THINKING_SUMMARY_START---\s*(.*?)\s*(?:---THINKING_SUMMARY_END---|\Z)",
+        _re.DOTALL,
+    )
+
+    m_think = think_pat.search(content_str)
+    if m_think:
+        thinking_summary = m_think.group(1).strip()
+        console.print(f"[bold green]DEBUG:[/bold green] Extracted thinking summary via regex (len={len(thinking_summary)})")
+        return thinking_summary
+    
+    # Fallback: use entire content
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Delimiters not found, using entire response as thinking summary")
+    return content_str.strip()
+
+
+def _build_stage2_prompt(thinking_summary: str, user_payload: dict, session_id: str) -> str:
+    """
+    Build Stage 2 prompt for feasibility report generation.
+    
+    Combines:
+    - Stage 2 template (feasibility_report_from_thinking.txt)
+    - Thinking summary from Stage 1
+    - Original development_context and documents
+    """
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Building Stage 2 prompt")
+    
+    # Load Stage 2 template
+    prompt_path = Path(__file__).parent.parent.parent / "prompts" / "feasibility_report_from_thinking.txt"
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading Stage 2 template from: {prompt_path}")
+    
+    try:
+        with open(prompt_path, 'r', encoding='utf-8') as f:
+            stage2_template = f.read()
+        console.print(f"[bold green]DEBUG:[/bold green] Stage 2 template loaded, length: {len(stage2_template)} characters")
+    except Exception as e:
+        console.print(f"[bold red]ERROR:[/bold red] Failed to load Stage 2 template: {e}")
+        raise
+    
+    # Build user message for Stage 2
+    stage2_payload = {
+        "thinking_summary": thinking_summary,
+        "development_context": user_payload.get("development_context", {}),
+        "documents": user_payload.get("documents", user_payload.get("documents_summary", {})),
+        "session_id": session_id
+    }
+    
+    user_message_stage2 = json.dumps(stage2_payload, ensure_ascii=False, indent=2)
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Stage 2 user payload length: {len(user_message_stage2)} characters")
+    
+    # Combine template and payload
+    full_prompt_stage2 = f"{stage2_template}\n\n---\n\nUSER PAYLOAD:\n\n{user_message_stage2}"
+    
+    console.print(f"[bold green]DEBUG:[/bold green] Stage 2 prompt built, total length: {len(full_prompt_stage2)} characters")
+    
+    return full_prompt_stage2
 
 
 # DEPRECATED: This function is no longer used in the simplified pipeline.
@@ -77,10 +164,6 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Development context provided: {development_context is not None}")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Session ID: {session_id}")
     
-<<<<<<< Updated upstream
-    # Go up two levels from src/app/ to reach project root, then into prompts/
-    prompt_path = os.path.join(os.path.dirname(__file__), "..", "..", "prompts", "feasibility_promptv2.txt")
-=======
     # Get project root directory (two levels up from this file)
     project_root = Path(__file__).parent.parent.parent
     
@@ -90,7 +173,6 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     else:
         prompt_path = project_root / "prompts" / "feasibility_promptv2.txt"
     
->>>>>>> Stashed changes
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading prompt from: {prompt_path}")
     
     with open(prompt_path, "r", encoding="utf-8") as f:
@@ -204,32 +286,47 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     console.print(user_message[:500] + "..." if len(user_message) > 500 else user_message)
     console.print("[dim]" + "="*80 + "[/dim]\n")
     
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Invoking LLM model...")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Starting two-stage feasibility generation...")
     
     try:
-        # Use v4 config if requested
-        if use_v3:
-            console.print(f"[bold yellow]DEBUG:[/bold yellow] Using v4 configuration for LLM")
-            from src.config.feasibility_v3_config import get_v3_config
-            from src.config.llm_config import UnifiedLLM
-            
-            v3_config = get_v3_config()
-            console.print(f"[bold yellow]DEBUG:[/bold yellow] V4 Config: temperature={v3_config['temperature']}, max_tokens={v3_config['max_output_tokens']}, timeout={v3_config['timeout']}")
-            
-            # Create v4-optimized model instance
-            v3_model = UnifiedLLM(
-                provider=v3_config['preferred_provider'],
-                temperature=v3_config['temperature'],
-                max_output_tokens=v3_config['max_output_tokens'],
-                request_timeout=v3_config['timeout']
-            )
-            result = v3_model.invoke(full_prompt)
-        else:
-            # Use default model for v2
-            result = model.invoke(full_prompt)
+        # ============================================================
+        # STAGE 1: Generate thinking summary
+        # ============================================================
+        console.print(f"\n[bold cyan]═══ STAGE 1: GENERATING THINKING SUMMARY ═══[/bold cyan]")
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Invoking LLM for Stage 1 (thinking summary)")
         
-        console.print(f"[bold green]DEBUG:[/bold green] LLM invocation successful")
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] Result type: {type(result)}")
+        result_stage1 = model.invoke(full_prompt)
+        content_stage1 = str(getattr(result_stage1, "content", result_stage1))
+        
+        console.print(f"[bold green]DEBUG:[/bold green] Stage 1 LLM invocation successful")
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Stage 1 content length: {len(content_stage1)} characters")
+        
+        # Extract thinking summary from Stage 1
+        thinking_summary = _extract_thinking_summary(content_stage1)
+        console.print(f"[bold green]✓ STAGE 1 COMPLETE:[/bold green] Thinking summary: {len(thinking_summary)} chars")
+        
+        # ============================================================
+        # STAGE 2: Generate feasibility report from thinking summary
+        # ============================================================
+        console.print(f"\n[bold cyan]═══ STAGE 2: GENERATING FEASIBILITY REPORT ═══[/bold cyan]")
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Building Stage 2 prompt with thinking summary")
+        
+        stage2_prompt = _build_stage2_prompt(thinking_summary, user_payload, session_id)
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Stage 2 prompt length: {len(stage2_prompt)} characters")
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Invoking LLM for Stage 2 (feasibility report)")
+        
+        result_stage2 = model.invoke(stage2_prompt)
+        content_stage2 = str(getattr(result_stage2, "content", result_stage2))
+        
+        console.print(f"[bold green]DEBUG:[/bold green] Stage 2 LLM invocation successful")
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Stage 2 content length: {len(content_stage2)} characters")
+        
+        # Extract feasibility report from Stage 2 (entire response is the report)
+        feasibility_report = content_stage2.strip()
+        console.print(f"[bold green]✓ STAGE 2 COMPLETE:[/bold green] Feasibility report: {len(feasibility_report)} chars")
+        
+        console.print(f"\n[bold green]═══ TWO-STAGE GENERATION COMPLETED SUCCESSFULLY ═══[/bold green]")
+        
     except Exception as e:
         console.print(f"[bold red]DEBUG ERROR:[/bold red] LLM invocation failed: {e}")
         return {
@@ -237,86 +334,6 @@ def generate_feasibility_questions(document_text: str, development_context: dict
             "feasibility_report": f"Error calling LLM: {e}"
         }
 
-    # Normalize result to a string
-    content = getattr(result, "content", result)
-    content_str = str(content)
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Content type: {type(content)}")
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Content length: {len(content_str)} characters")
-    
-    # Show a preview of the LLM response
-    console.print("\n[bold magenta]DEBUG - LLM RESPONSE PREVIEW:[/bold magenta]")
-    console.print("[dim]" + "="*80 + "[/dim]")
-    response_preview = content_str[:800] + "\n\n... [truncated] ...\n\n" + content_str[-300:] if len(content_str) > 1100 else content_str
-    console.print(f"[green]{response_preview}[/green]")
-    console.print("[dim]" + "="*80 + "[/dim]\n")
-
-    # Parse the delimited response to extract both markdown documents
-    thinking_summary = ""
-    feasibility_report = ""
-
-    # Optional: strip surrounding code fences if present
-    cs_strip = content_str.strip()
-    if cs_strip.startswith("```") and cs_strip.endswith("```"):
-        console.print("[bold yellow]DEBUG:[/bold yellow] Stripping surrounding code fences from response")
-        # remove only one outer layer of fences
-        cs_body = cs_strip[3:]
-        # drop optional language tag until first newline
-        nl = cs_body.find("\n")
-        if nl != -1:
-            cs_body = cs_body[nl+1:]
-        cs_body = cs_body.rstrip("`")
-        content_str = cs_body.strip()
-
-    # Try robust regex-based extraction (handles missing END markers)
-    import re as _re
-    think_pat = _re.compile(
-        r"---THINKING_SUMMARY_START---\s*(.*?)\s*(?:---THINKING_SUMMARY_END---|---FEASIBILITY_REPORT_START---|\Z)",
-        _re.DOTALL,
-    )
-    report_pat = _re.compile(
-        r"---FEASIBILITY_REPORT_START---\s*(.*?)\s*(?:---FEASIBILITY_REPORT_END---|\Z)",
-        _re.DOTALL,
-    )
-
-    m_think = think_pat.search(content_str)
-    if m_think:
-        thinking_summary = m_think.group(1).strip()
-        console.print(f"[bold green]DEBUG:[/bold green] Extracted thinking summary via regex (len={len(thinking_summary)})")
-
-    m_report = report_pat.search(content_str)
-    if m_report:
-        feasibility_report = m_report.group(1).strip()
-        console.print(f"[bold green]DEBUG:[/bold green] Extracted feasibility report via regex (len={len(feasibility_report)})")
-    
-    # Fallback: try JSON parsing if delimiters not found
-    if not thinking_summary or not feasibility_report:
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] Delimiters not found, trying JSON parsing...")
-        try:
-            parsed_json = json.loads(content_str)
-            if isinstance(parsed_json, dict):
-                thinking_summary = parsed_json.get("thinking_summary.md", thinking_summary)
-                feasibility_report = parsed_json.get("feasibility_report.md", feasibility_report)
-                if thinking_summary or feasibility_report:
-                    console.print(f"[bold green]DEBUG:[/bold green] Successfully parsed JSON response")
-        except json.JSONDecodeError:
-            console.print(f"[bold yellow]DEBUG:[/bold yellow] Not valid JSON, using content as-is")
-    
-    # Partial fallback heuristics if only one section present
-    if thinking_summary and not feasibility_report:
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] Feasibility report missing; leaving empty to trigger retry")
-        feasibility_report = ""
-    elif feasibility_report and not thinking_summary:
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] Thinking summary missing; generating minimal placeholder")
-        thinking_summary = "# Thinking Summary\n\n(Generated from unstructured response. Retry may improve extraction.)"
-
-    # Final fallback: if both still empty, dump entire content as feasibility report
-    if not feasibility_report and not thinking_summary:
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] No sections parsed; using entire response as feasibility report")
-        feasibility_report = content_str
-        thinking_summary = "# Thinking Summary\n\n(Generated from unstructured response)"
-    
-    console.print(f"[bold green]DEBUG:[/bold green] Extracted thinking summary: {len(thinking_summary)} chars")
-    console.print(f"[bold green]DEBUG:[/bold green] Extracted feasibility report: {len(feasibility_report)} chars")
     
     return {
         "thinking_summary": thinking_summary,
