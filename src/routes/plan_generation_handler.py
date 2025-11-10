@@ -21,7 +21,7 @@ class PlanGenerationHandler:
     Handles project plan generation using reflection loop.
     
     Workflow:
-    1. Get document context (intelligent or raw)
+    1. Get document context from MD files
     2. Combine with feasibility assessment
     3. Initialize reflection state
     4. Execute LangGraph workflow (Draft → Reflect → Revise)
@@ -41,8 +41,7 @@ class PlanGenerationHandler:
     def generate_plan(
         self,
         session: Session,
-        max_iterations: int = 5,
-        use_intelligent_processing: bool = True
+        max_iterations: int = 5
     ) -> dict:
         """
         Generate project plan using reflection loop.
@@ -50,7 +49,6 @@ class PlanGenerationHandler:
         Args:
             session: Session object
             max_iterations: Maximum reflection iterations
-            use_intelligent_processing: Use Document Intelligence Pipeline
         
         Returns:
             Dictionary with plan, evidence, result, file_path, steps, execution_time, iterations_completed, status
@@ -59,18 +57,9 @@ class PlanGenerationHandler:
         start_time = time.time()
         
         try:
-            # Import necessary functions
-            from src.app.feasibility_agent import extract_text_from_pdfs
-            
-            # Step 1: Extract or retrieve document context
-            print(f"Step 1: Processing document context (intelligent_processing={use_intelligent_processing})")
-            
-            if use_intelligent_processing:
-                document_context = self._get_intelligent_context(session)
-            else:
-                print("Using raw text extraction")
-                document_context = extract_text_from_pdfs(session.document_paths)
-                print(f"Extracted raw context: {len(document_context)} characters")
+            # Step 1: Get document context from MD files
+            print(f"Step 1: Processing document context from MD files")
+            document_context = self._get_intelligent_context(session)
             
             # Step 2: Combine document context with feasibility assessment
             print("Step 2: Combining document context with feasibility assessment")

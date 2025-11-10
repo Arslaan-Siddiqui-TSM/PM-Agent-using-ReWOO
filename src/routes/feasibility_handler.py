@@ -41,7 +41,7 @@ class FeasibilityHandler:
         development_context: Optional[Dict[str, str]] = None
     ) -> dict:
         """
-        Generate feasibility assessment from MD files + Q&A.
+        Generate feasibility assessment using graph execution.
         
         Args:
             session: Session object
@@ -54,43 +54,27 @@ class FeasibilityHandler:
         start_time = time.time()
         
         try:
-            # Import the feasibility functions
-            from src.app.feasibility_agent import (
-                generate_feasibility_questions,
-                save_development_context_to_json
-            )
+            from src.app.feasibility_agent import save_development_context_to_json
             
-            # Step 1: Get consolidated context file for analysis
+            # Step 1: Get MD file paths
             print("Step 1: Preparing document input for feasibility analysis")
-            docs_text = self._get_context_file(session)
-            print(f"Loaded {len(docs_text)} characters from consolidated context")
+            md_file_paths = self._get_md_file_paths(session)
+            print(f"Prepared {len(md_file_paths)} MD file paths")
             
-            # Step 1.5: Add development process information if provided
+            # Step 1.5: Save development context if provided
             dev_context_json_path = None
             if development_context:
-                print("Development context provided, integrating into assessment")
-                print(f"DEBUG: Development context fields provided: {list(development_context.keys())}")
-                
-                # Step 1.5a: Save development context to JSON file
-                print("Step 1.5a: Saving development context to JSON file")
+                print("Development context provided, saving to JSON")
                 dev_context_json_path = save_development_context_to_json(
                     development_context=development_context,
                     session_id=session.session_id,
                     output_dir="output/intermediate"
                 )
                 print(f"Development context saved to JSON: {dev_context_json_path}")
-                
-                dev_context_text = self._format_dev_context(development_context)
-                docs_text = docs_text + dev_context_text
-                print(f"Development context added to assessment: {len(dev_context_text)} characters")
-                
-                # Store development context in session for later use
-                session.development_context = development_context
-                session.development_context_json_path = dev_context_json_path
             else:
-                print("No development context provided. Proceeding without development process information.")
+                print("No development context provided.")
             
-            # Step 2: Generate feasibility assessment
+            # Step 2: Generate feasibility assessment using graph
             from src.config.feature_flags import feature_flags
             
             if feature_flags.use_hardcoded_feasibility:
@@ -100,29 +84,37 @@ class FeasibilityHandler:
                 print("="*80 + "\n")
                 feasibility_result = self._load_hardcoded_feasibility()
             else:
-                print("Step 2: Generating feasibility assessment with LLM (using MD files)")
-                feasibility_result = self._generate_with_retry(
-                    docs_text,
-                    development_context,
-                    session.session_id
+                print("Step 2: Initializing Feasibility graph state")
+                from src.states.feasibility_state import FeasibilityState
+                
+                feasibility_state = FeasibilityState(
+                    session_id=session.session_id,
+                    md_file_paths=md_file_paths,
+                    development_context=development_context
                 )
+                
+                print("Step 3: Executing Feasibility graph")
+                thinking_summary, feasibility_report = self._execute_graph(feasibility_state)
+                
+                feasibility_result: Dict[str, str] = {
+                    "thinking_summary": thinking_summary or "",
+                    "feasibility_report": feasibility_report or ""
+                }
             
             # Validate outputs
             self._validate_outputs(feasibility_result)
             
-            # Step 3: Save both markdown files
-            print("Step 3: Saving feasibility documents to files")
+            # Step 4: Save both markdown files
+            print("Step 4: Saving feasibility documents to files")
             thinking_path, report_path = self._save_feasibility_files(
                 feasibility_result,
                 session.session_id
             )
             
-            # Step 4: Store in session
-            print("Step 4: Storing feasibility assessment in session")
+            # Step 5: Store in session
+            print("Step 5: Storing feasibility assessment in session")
             session.feasibility_assessment = feasibility_result["feasibility_report"]
             session.feasibility_file_path = str(report_path)
-            session.thinking_summary = feasibility_result["thinking_summary"]
-            session.thinking_summary_file_path = str(thinking_path)
             print(f"Feasibility documents stored in session")
             
             execution_time = time.time() - start_time
@@ -144,109 +136,51 @@ class FeasibilityHandler:
                 detail=f"Error during feasibility check: {str(e)}"
             )
     
-    def _get_context_file(self, session: Session) -> str:
+    def _get_md_file_paths(self, session: Session) -> list[str]:
         """
-        Read the consolidated requirement_context.md file.
+        Get list of MD file paths from the session's parsed documents directory.
         
-        This file is automatically created during parsing and contains
-        all MD documents with headers and separators.
+        Used for v3 JSON conversion.
         """
-        if not session.context_file_path:
-            raise ValueError("No context file found. Please ensure documents are uploaded and parsed first.")
+        if not session.parsed_documents_dir:
+            raise ValueError("No parsed documents directory found. Please ensure documents are uploaded and parsed first.")
         
-        context_file = Path(session.context_file_path)
-        if not context_file.exists():
-            raise ValueError(f"Context file not found: {context_file}")
+        md_dir = Path(session.parsed_documents_dir)
+        if not md_dir.exists():
+            raise ValueError(f"MD directory not found: {md_dir}")
         
-        print(f"Reading consolidated context file: {context_file.name}")
+        # Find all .md files in the directory
+        md_files = list(md_dir.glob("*.md"))
         
-        with open(context_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        if not md_files:
+            raise ValueError(f"No MD files found in {md_dir}")
         
-        print(f"Loaded {len(content):,} characters from consolidated context")
-        return content
+        print(f"Found {len(md_files)} MD files in {md_dir.name}")
+        md_file_paths = [str(md_path.absolute()) for md_path in sorted(md_files)]
+        
+        for path in md_file_paths:
+            print(f"  - {Path(path).name}")
+        
+        return md_file_paths
     
-    def _format_dev_context(self, development_context: Dict[str, str]) -> str:
-        """Format development context as markdown."""
-        dev_context_text = "\n\n## DEVELOPMENT PROCESS INFORMATION:\n\n"
-        dev_context_text += "The following information about the software development process has been provided:\n\n"
+    def _execute_graph(self, state):
+        """Execute the feasibility graph and return results."""
+        from src.app.feasibility_graph import get_feasibility_graph
         
-        context_labels = {
-            "methodology": "Development Methodology",
-            "teamSize": "Team Size",
-            "timeline": "Project Timeline",
-            "budget": "Budget Constraints",
-            "techStack": "Technology Stack",
-            "constraints": "Key Constraints or Risks"
-        }
+        graph = get_feasibility_graph(state)
         
-        for key, value in development_context.items():
-            if value and value.strip():
-                label = context_labels.get(key, key.replace("_", " ").title())
-                dev_context_text += f"**{label}:** {value}\n\n"
-                print(f"DEBUG: - {label}: {value[:100]}{'...' if len(value) > 100 else ''}")
+        thinking_summary = None
+        feasibility_report = None
         
-        return dev_context_text
-    
-    def _generate_with_retry(
-        self,
-        document_text: str,
-        development_context: Optional[Dict[str, str]],
-        session_id: str
-    ) -> Dict[str, str]:
-        """Generate feasibility assessment with retry logic using MD files."""
-        from src.app.feasibility_agent import generate_feasibility_questions
+        for s in graph.stream(state):
+            node_name = next(iter(s))
+            data = s[node_name]
+            print(f"Completed graph node: {node_name}")
+            
+            thinking_summary = data.get("thinking_summary")
+            feasibility_report = data.get("feasibility_report")
         
-        # DEBUG: Show what context is being sent to the LLM
-        print("\n" + "="*80)
-        print("DEBUG: CONTEXT BEING SENT TO LLM FOR FEASIBILITY ASSESSMENT (MD FILES)")
-        print("="*80)
-        print(f"Using MD file input: {len(document_text)} characters")
-        print(f"Development context provided: {development_context is not None}")
-        if development_context:
-            print(f"Development context keys: {list(development_context.keys())}")
-        print("="*80 + "\n")
-        
-        max_retries = 3
-        retry_delay = 5
-        feasibility_result = None
-        
-        for attempt in range(max_retries):
-            try:
-                # Generate assessment from MD files
-                # Returns dict with 'thinking_summary' and 'feasibility_report' keys
-                feasibility_result = generate_feasibility_questions(
-                    document_text=document_text,
-                    development_context=development_context,
-                    session_id=session_id,
-                    use_v3=True
-                )
-                print("Feasibility assessment generated from MD files")
-                break
-            except Exception as e:
-                error_msg = str(e)
-                if "429" in error_msg or "Resource exhausted" in error_msg:
-                    if attempt < max_retries - 1:
-                        wait_time = retry_delay * (2 ** attempt)
-                        print(f"Rate limit hit. Waiting {wait_time} seconds before retry {attempt + 1}/{max_retries}...")
-                        time.sleep(wait_time)
-                    else:
-                        print(f"Max retries reached. Rate limit still active.")
-                        raise HTTPException(
-                            status_code=429,
-                            detail=f"Google Gemini API rate limit exceeded during feasibility check. Please try again in a few minutes."
-                        )
-                else:
-                    # Not a rate limit error, re-raise immediately
-                    raise
-        
-        if feasibility_result is None:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to generate feasibility assessment"
-            )
-        
-        return feasibility_result
+        return thinking_summary, feasibility_report
     
     def _validate_outputs(self, feasibility_result: Dict[str, str]):
         """Validate feasibility outputs are not empty."""
