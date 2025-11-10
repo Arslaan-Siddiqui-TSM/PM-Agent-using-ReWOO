@@ -1,5 +1,12 @@
 # 🚀 Docling Optimization Guide
 
+## 📋 Current Implementation
+
+Docling now exports **directly to JSON** using `export_to_dict()`:
+- ✅ **Format**: Native JSON structure with pages, texts, tables, layouts
+- ✅ **Performance**: No additional LLM conversion step needed
+- ✅ **Cost**: Free - no LLM API calls for format conversion
+
 ## ⚡ Why is Docling Slow?
 
 Docling is **comprehensive but resource-intensive**:
