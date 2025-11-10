@@ -145,15 +145,14 @@ def extract_text_from_pdfs(file_paths: list[str]) -> str:
     return all_text.strip()
 
 
-def generate_feasibility_questions(document_text: str, development_context: dict | None = None, session_id: str = "unknown", use_v3: bool = True, md_file_paths: list[str] | None = None) -> dict:
+def generate_feasibility_questions(document_text: str, development_context: dict | None = None, session_id: str = "unknown", use_v3: bool = True) -> dict:
     """Generate feasibility questions for the Tech Lead review.
 
     Args:
-        document_text (str): The text content of the document (for v2 compatibility).
+        document_text (str): The markdown text content from parsed documents.
         development_context (dict, optional): Development process information from user.
         session_id (str, optional): Session ID for the assessment.
-        use_v3 (bool, optional): Use v4 prompt with JSON input (default: True).
-        md_file_paths (list[str], optional): List of MD file paths for v4 JSON conversion.
+        use_v3 (bool, optional): Use v3/v4 prompt (default: True).
 
     Returns:
         dict: Dictionary with keys 'thinking_summary' and 'feasibility_report' containing markdown text.
@@ -180,58 +179,14 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     
     console.print(f"[bold yellow]DEBUG:[/bold yellow] System prompt loaded, length: {len(system_prompt)} characters")
     
-    # V4-specific: Load JSON files from session directory
-    documents_json = None
-    if use_v3 and md_file_paths:
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] Looking for JSON files in session directory")
-        
-        # Try to load pre-converted JSON files from session directory
-        try:
-            # Infer JSON directory from MD file path
-            md_path = Path(md_file_paths[0])
-            session_dir = md_path.parent.parent  # Go up from raw/ to session_xxx/
-            json_dir = session_dir / "json"
-            
-            if json_dir.exists():
-                console.print(f"[bold green]DEBUG:[/bold green] Found JSON directory: {json_dir}")
-                
-                # Load all JSON files
-                json_files = sorted(json_dir.glob("*.json"))
-                loaded_documents = []
-                
-                for json_file in json_files:
-                    with open(json_file, 'r', encoding='utf-8') as f:
-                        doc = json.load(f)
-                        loaded_documents.append(doc)
-                
-                documents_json = {
-                    "documents": loaded_documents,
-                    "summary": {
-                        "total_documents": len(loaded_documents),
-                        "source": "pre_converted_json"
-                    }
-                }
-                
-                console.print(f"[bold green]DEBUG:[/bold green] Loaded {len(loaded_documents)} JSON documents")
-            else:
-                console.print(f"[bold yellow]DEBUG:[/bold yellow] JSON directory not found: {json_dir}")
-                console.print(f"[bold yellow]DEBUG:[/bold yellow] JSON conversion may be disabled or not yet complete")
-                documents_json = None
-                
-        except Exception as e:
-            console.print(f"[bold red]WARNING:[/bold red] Failed to load JSON files: {e}")
-            console.print(f"[bold yellow]DEBUG:[/bold yellow] Falling back to text-based input")
-            documents_json = None
+    # Prepare text input from MD files
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Using MD file text input")
     
-    # Fallback for v2 or if JSON not available
-    if not documents_json:
-        if use_v3:
-            console.print(f"[bold yellow]DEBUG:[/bold yellow] No JSON documents available, using text-based fallback")
-        # Truncate document text if too long (keep reasonable limit for token budget)
-        max_doc_length = 150000 if use_v3 else 25000  # V4 allows much larger context
-        if len(document_text) > max_doc_length:
-            console.print(f"[bold yellow]DEBUG:[/bold yellow] Truncating document text to {max_doc_length} characters")
-            document_text = document_text[:max_doc_length]
+    # Truncate document text if too long (keep reasonable limit for token budget)
+    max_doc_length = 150000 if use_v3 else 25000  # V3/V4 allows larger context
+    if len(document_text) > max_doc_length:
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Truncating document text to {max_doc_length} characters")
+        document_text = document_text[:max_doc_length]
     
     # Prepare the user payload as per the prompt's INPUT CONTRACT
     import json
@@ -248,25 +203,16 @@ def generate_feasibility_questions(document_text: str, development_context: dict
             "constraints": "unknown"
         }
     
-    # Build payload based on prompt version
-    if use_v3 and documents_json:
-        # V4 format: structured JSON documents
-        user_payload = {
-            "development_context": development_context,
-            "documents": documents_json.get("documents", [])
+    # Build payload with MD text content
+    user_payload = {
+        "development_context": development_context,
+        "documents_summary": {
+            "session_id": session_id,
+            "content": document_text,
+            "source": "markdown files"
         }
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] Using v4 JSON payload with {len(user_payload['documents'])} structured documents")
-    else:
-        # V2 format or fallback: plain text documents_summary
-        user_payload = {
-            "development_context": development_context,
-            "documents_summary": {
-                "session_id": session_id,
-                "content": document_text,
-                "source": "project documents"
-            }
-        }
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] Using v2 text payload format")
+    }
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Using MD text payload format")
     
     # Build the full prompt with system instructions + JSON payload
     user_message = json.dumps(user_payload, ensure_ascii=False, indent=2)

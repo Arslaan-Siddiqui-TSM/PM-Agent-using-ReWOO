@@ -6,7 +6,7 @@ class Session:
     """
     Represents a user session with uploaded documents and processing state.
     
-    Simplified Pipeline: Upload → Parse to MD → Convert to JSON → Feasibility
+    Simplified Pipeline: Upload → Parse to Markdown → Feasibility
     
     Attributes:
         session_id: Unique identifier for the session
@@ -19,8 +19,8 @@ class Session:
         # Parsing fields
         parsed_documents: List of ParsedDocument objects (with .output_md_path)
         parsed_documents_dir: Path to session's parsed markdown folder
-        json_documents_dir: Path to session's JSON documents folder
-        json_conversion_log: Statistics about JSON conversion
+        context_file_path: Path to consolidated requirement_context.md file
+        json_conversion_log: Deprecated field (kept for backward compatibility)
         parsing_log_path: Path to parsing log JSON file
         
         # Background processing status
@@ -46,8 +46,8 @@ class Session:
         # Parsing fields
         self.parsed_documents: Optional[List[Any]] = None
         self.parsed_documents_dir: Optional[str] = None
-        self.json_documents_dir: Optional[str] = None
-        self.json_conversion_log: Optional[Dict[str, Any]] = None
+        self.context_file_path: Optional[str] = None  # Path to requirement_context.md
+        self.json_conversion_log: Optional[Dict[str, Any]] = None  # Deprecated, kept for backward compatibility
         self.parsing_log_path: Optional[str] = None
     
     def is_expired(self, timeout_minutes=60):

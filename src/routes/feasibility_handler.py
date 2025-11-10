@@ -60,12 +60,10 @@ class FeasibilityHandler:
                 save_development_context_to_json
             )
             
-            # Step 1: Get MD file paths for v3 (or combined text for v2 fallback)
+            # Step 1: Get consolidated context file for analysis
             print("Step 1: Preparing document input for feasibility analysis")
-            md_file_paths = self._get_md_file_paths(session)
-            docs_text = self._get_md_files_context(session)  # Fallback for v2 or dev context formatting
-            print(f"Prepared {len(md_file_paths)} MD file paths")
-            print(f"Loaded {len(docs_text)} characters as fallback text")
+            docs_text = self._get_context_file(session)
+            print(f"Loaded {len(docs_text)} characters from consolidated context")
             
             # Step 1.5: Add development process information if provided
             dev_context_json_path = None
@@ -102,12 +100,11 @@ class FeasibilityHandler:
                 print("="*80 + "\n")
                 feasibility_result = self._load_hardcoded_feasibility()
             else:
-                print("Step 2: Generating feasibility assessment with LLM (using v3 prompt)")
+                print("Step 2: Generating feasibility assessment with LLM (using MD files)")
                 feasibility_result = self._generate_with_retry(
                     docs_text,
                     development_context,
-                    session.session_id,
-                    md_file_paths=md_file_paths
+                    session.session_id
                 )
             
             # Validate outputs
@@ -147,66 +144,27 @@ class FeasibilityHandler:
                 detail=f"Error during feasibility check: {str(e)}"
             )
     
-    def _get_md_files_context(self, session: Session) -> str:
+    def _get_context_file(self, session: Session) -> str:
         """
-        Read all MD files from the session's parsed documents directory.
+        Read the consolidated requirement_context.md file.
         
-        Works for both cached and newly parsed documents.
-        Returns combined text for v2 compatibility.
+        This file is automatically created during parsing and contains
+        all MD documents with headers and separators.
         """
-        if not session.parsed_documents_dir:
-            raise ValueError("No parsed documents directory found. Please ensure documents are uploaded and parsed first.")
+        if not session.context_file_path:
+            raise ValueError("No context file found. Please ensure documents are uploaded and parsed first.")
         
-        md_dir = Path(session.parsed_documents_dir)
-        if not md_dir.exists():
-            raise ValueError(f"MD directory not found: {md_dir}")
+        context_file = Path(session.context_file_path)
+        if not context_file.exists():
+            raise ValueError(f"Context file not found: {context_file}")
         
-        # Find all .md files in the directory
-        md_files = list(md_dir.glob("*.md"))
+        print(f"Reading consolidated context file: {context_file.name}")
         
-        if not md_files:
-            raise ValueError(f"No MD files found in {md_dir}")
+        with open(context_file, 'r', encoding='utf-8') as f:
+            content = f.read()
         
-        print(f"Reading {len(md_files)} MD files from {md_dir.name}...")
-        md_content = []
-        
-        for md_path in sorted(md_files):
-            print(f"  Reading: {md_path.name}")
-            with open(md_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                md_content.append(f"# Document: {md_path.stem}\n\n{content}")
-                print(f"    Loaded {len(content)} characters")
-        
-        combined_content = "\n\n---\n\n".join(md_content)
-        print(f"Combined MD content: {len(combined_content)} characters from {len(md_content)} files")
-        return combined_content
-    
-    def _get_md_file_paths(self, session: Session) -> list[str]:
-        """
-        Get list of MD file paths from the session's parsed documents directory.
-        
-        Used for v3 JSON conversion.
-        """
-        if not session.parsed_documents_dir:
-            raise ValueError("No parsed documents directory found. Please ensure documents are uploaded and parsed first.")
-        
-        md_dir = Path(session.parsed_documents_dir)
-        if not md_dir.exists():
-            raise ValueError(f"MD directory not found: {md_dir}")
-        
-        # Find all .md files in the directory
-        md_files = list(md_dir.glob("*.md"))
-        
-        if not md_files:
-            raise ValueError(f"No MD files found in {md_dir}")
-        
-        print(f"Found {len(md_files)} MD files in {md_dir.name}")
-        md_file_paths = [str(md_path.absolute()) for md_path in sorted(md_files)]
-        
-        for path in md_file_paths:
-            print(f"  - {Path(path).name}")
-        
-        return md_file_paths
+        print(f"Loaded {len(content):,} characters from consolidated context")
+        return content
     
     def _format_dev_context(self, development_context: Dict[str, str]) -> str:
         """Format development context as markdown."""
@@ -234,22 +192,16 @@ class FeasibilityHandler:
         self,
         document_text: str,
         development_context: Optional[Dict[str, str]],
-        session_id: str,
-        md_file_paths: Optional[list[str]] = None
+        session_id: str
     ) -> Dict[str, str]:
-        """Generate feasibility assessment with retry logic using v3 prompt."""
+        """Generate feasibility assessment with retry logic using MD files."""
         from src.app.feasibility_agent import generate_feasibility_questions
         
         # DEBUG: Show what context is being sent to the LLM
         print("\n" + "="*80)
-        print("DEBUG: CONTEXT BEING SENT TO LLM FOR FEASIBILITY ASSESSMENT (V3)")
+        print("DEBUG: CONTEXT BEING SENT TO LLM FOR FEASIBILITY ASSESSMENT (MD FILES)")
         print("="*80)
-        if md_file_paths:
-            print(f"Using v3 JSON input with {len(md_file_paths)} MD files")
-            for path in md_file_paths:
-                print(f"  - {Path(path).name}")
-        else:
-            print(f"Fallback to v2 text input: {len(document_text)} characters")
+        print(f"Using MD file input: {len(document_text)} characters")
         print(f"Development context provided: {development_context is not None}")
         if development_context:
             print(f"Development context keys: {list(development_context.keys())}")
@@ -261,16 +213,15 @@ class FeasibilityHandler:
         
         for attempt in range(max_retries):
             try:
-                # Pass md_file_paths for v3, development_context, and session_id
+                # Generate assessment from MD files
                 # Returns dict with 'thinking_summary' and 'feasibility_report' keys
                 feasibility_result = generate_feasibility_questions(
                     document_text=document_text,
                     development_context=development_context,
                     session_id=session_id,
-                    use_v3=True,  # Enable v3 prompt
-                    md_file_paths=md_file_paths
+                    use_v3=True
                 )
-                print("Feasibility assessment generated using v3 prompt")
+                print("Feasibility assessment generated from MD files")
                 break
             except Exception as e:
                 error_msg = str(e)

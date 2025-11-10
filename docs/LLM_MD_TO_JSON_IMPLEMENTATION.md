@@ -1,8 +1,21 @@
-# LLM-based Markdown to JSON Conversion - Implementation Summary
+# ⚠️ DEPRECATED: LLM-based Markdown to JSON Conversion
 
-## Overview
+**Status:** This document is deprecated as of the direct JSON export implementation.
 
-Successfully replaced the regex-based markdown-to-JSON converter with an LLM-based converter that provides semantic understanding and flexible schema adaptation.
+## Reason for Deprecation
+
+Docling now exports directly to JSON using `export_to_dict()`, eliminating the need for a separate markdown-to-JSON conversion step. This provides:
+- Faster processing (no LLM conversion step)
+- Lower costs (no LLM API calls)
+- Better structure preservation (native docling JSON format)
+
+## Historical Overview
+
+This document describes the previous implementation where we:
+1. Parsed PDFs to Markdown using Docling
+2. Converted Markdown to JSON using LLM
+
+This two-step process has been replaced with direct JSON output from Docling.
 
 ## What Was Changed
 

@@ -34,7 +34,7 @@ class FeatureFlags(BaseSettings):
     use_hardcoded_session: bool = False
     hardcoded_collection: str = "pm_agent_468e90d3"
     hardcoded_md_dir: str = "data/hardcoded_session/markdown"
-    hardcoded_json_dir: str = "data/hardcoded_session/json"
+    hardcoded_context_file: str = "data/hardcoded_session/context/requirement_context.md"
     
     # Hardcoded feasibility mode (skip LLM calls for development/testing)
     use_hardcoded_feasibility: bool = False

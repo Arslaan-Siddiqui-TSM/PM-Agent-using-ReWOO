@@ -26,7 +26,7 @@ class UploadHandler:
     1. Validate uploaded files or use default files
     2. Save to data/uploads/ (if uploaded)
     3. Create session and store file paths
-    4. Parse documents to markdown and JSON
+    4. Parse documents to Markdown
     5. Return upload statistics
     """
     
@@ -86,7 +86,13 @@ class UploadHandler:
                 
                 session.parsed_documents = [MockParsedDoc(md) for md in md_files]
                 session.parsed_documents_dir = str(md_dir)
-                session.json_documents_dir = feature_flags.hardcoded_json_dir
+                
+                # Use pre-created consolidated context file
+                context_file = Path(feature_flags.hardcoded_context_file)
+                if not context_file.exists():
+                    raise Exception(f"Hardcoded context file not found: {context_file}")
+                
+                session.context_file_path = str(context_file.absolute())
                 
                 # Set completed status
                 session.processing_status = "completed"
@@ -97,7 +103,8 @@ class UploadHandler:
                 
                 print(f"Hardcoded session created: {session_id}")
                 print(f"  MD files: {len(md_files)}")
-                print(f"  JSON dir: {session.json_documents_dir}\n")
+                print(f"  Context file: {context_file.name} (pre-created)")
+                print(f"  MD dir: {session.parsed_documents_dir}\n")
                 
                 return {
                     "session_id": session_id,
@@ -233,13 +240,12 @@ class UploadHandler:
     
     def _process_documents_sync(self, session: Session, uploaded_files: List[str]) -> None:
         """
-        Process documents: Parse → Convert → Ready
+        Process documents: Parse → Ready
         Updates session status upon completion or failure.
         
         Workflow:
-            1. Parse PDFs → Markdown files (DoclingParser)
-            2. Convert Markdown → JSON (LLM-based)
-            3. Ready for feasibility questions and plan generation
+            1. Parse PDFs → Markdown files (DoclingParser with LangChain)
+            2. Ready for feasibility questions and plan generation
         
         Args:
             session: Session object
@@ -282,81 +288,19 @@ class UploadHandler:
             print(f"   • Cache misses: {cache_misses}")
             
             # ========================================
-            # STEP 1.5: CONVERT Markdown → JSON (LLM-based)
-            # ========================================
-            # CRITICAL: This runs SYNCHRONOUSLY to ensure JSON files are ready
-            # before marking session as complete.
-            print(f"\n{'='*80}")
-            print(f"📊 STEP 1.5: Converting Markdown to JSON using LLM...")
-            print(f"⚠️  This step runs synchronously and blocks until complete.")
-            print(f"-" * 80)
-            
-            from src.config.llm_config import USE_LLM_CONVERTER
-            from src.core.llm_md_to_json_converter import convert_markdown_to_json
-            
-            json_conversion_result = None
-            
-            if USE_LLM_CONVERTER:
-                try:
-                    # Get markdown file paths
-                    md_file_paths = [doc.output_md_path for doc in parsed_documents]
-                    
-                    print(f"   Converting {len(md_file_paths)} markdown files to JSON...")
-                    
-                    # Create JSON output directory
-                    date_str = datetime.now().strftime("%Y%m%d")
-                    json_dir = f"output/session_{session.session_id[:8]}_{date_str}/json"
-                    
-                    # SYNCHRONOUS CONVERSION - blocks until all files are converted
-                    json_conversion_result = convert_markdown_to_json(
-                        md_file_paths=md_file_paths,
-                        output_dir=json_dir,
-                        verbose=True
-                    )
-                    
-                    print(f"\n✅ JSON Conversion Complete:")
-                    print(f"   • Successful: {json_conversion_result['summary']['successful']}")
-                    print(f"   • Failed: {json_conversion_result['summary']['failed']}")
-                    print(f"   • Output: {json_dir}")
-                    
-                    # Store in session
-                    session.json_documents_dir = json_dir
-                    session.json_conversion_log = json_conversion_result
-                    
-                except Exception as e:
-                    print(f"\n⚠️  JSON Conversion Warning: {e}")
-                    print(f"   This is not a fatal error - continuing with markdown-only processing...")
-                    print(f"   Note: JSON files are optional. Feasibility analysis will work with markdown files.")
-                    session.json_documents_dir = None
-                    session.json_conversion_log = {"error": str(e), "status": "skipped"}
-            else:
-                print(f"   ⏭️  LLM converter disabled (USE_LLM_CONVERTER=false)")
-                print(f"   Skipping JSON conversion - using markdown files only...")
-                session.json_documents_dir = None
-                session.json_conversion_log = {"status": "disabled"}
-            
-            # ========================================
             # STEP 2: Store Results in Session
             # ========================================
             session.parsed_documents = parsed_documents
-            session.parsed_documents_dir = parsing_result["md_directory"]
+            session.parsed_documents_dir = parsing_result["markdown_directory"]
+            session.context_file_path = parsing_result["context_file_path"]
             session.parsing_log_path = parsing_result["parsing_log_path"]
             
             # Update session status to completed
-            # CRITICAL: Only set to "completed" after ALL steps are done:
-            # - Parsing (PDF → MD)
-            # - JSON Conversion (MD → JSON)
             session.processing_status = "completed"
-            
-            json_status = ""
-            if session.json_documents_dir and session.json_conversion_log:
-                successful = session.json_conversion_log.get('summary', {}).get('successful', 0)
-                json_status = f"Converted {successful} documents to JSON. "
             
             session.status_message = (
                 f"✅ Successfully processed {len(uploaded_files)} files. "
-                f"Created {len(parsed_documents)} MD files. "
-                f"{json_status}"
+                f"Created {len(parsed_documents)} Markdown files. "
                 f"Ready for feasibility questions and plan generation!"
             )
             
@@ -364,7 +308,9 @@ class UploadHandler:
             print(f"✅ Processing Complete!")
             print(f"{'='*80}")
             print(f"   Session ID: {session.session_id}")
-            print(f"   MD Files: {len(parsed_documents)}")
+            print(f"   Markdown Files: {len(parsed_documents)}")
+            print(f"   Context File: {Path(session.context_file_path).name}")
+            print(f"   Output: {session.parsed_documents_dir}")
             print(f"   Status: Ready for feasibility questions and plan generation")
             print(f"{'='*80}\n")
             
