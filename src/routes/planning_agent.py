@@ -181,8 +181,11 @@ async def check_feasibility(request: FeasibilityRequest):
             )
     
     # Validate required session data is present
-    if not session.parsed_documents:
+    # Check both parsed_documents and parsed_documents_dir for backwards compatibility
+    if not session.parsed_documents and not session.parsed_documents_dir:
         print(f"Session {request.session_id} marked complete but missing required data")
+        print(f"  - parsed_documents: {session.parsed_documents}")
+        print(f"  - parsed_documents_dir: {session.parsed_documents_dir}")
         raise HTTPException(
             status_code=500,
             detail="Session processing incomplete: missing parsed documents. Please re-upload documents."
@@ -257,8 +260,11 @@ async def generate_plan(request: GeneratePlanRequest):
             )
     
     # Validate required session data is present
-    if not session.parsed_documents:
+    # Check both parsed_documents and parsed_documents_dir for backwards compatibility
+    if not session.parsed_documents and not session.parsed_documents_dir:
         print(f"Session {request.session_id} marked complete but missing required data")
+        print(f"  - parsed_documents: {session.parsed_documents}")
+        print(f"  - parsed_documents_dir: {session.parsed_documents_dir}")
         raise HTTPException(
             status_code=500,
             detail="Session processing incomplete: missing parsed documents. Please re-upload documents."
@@ -270,8 +276,7 @@ async def generate_plan(request: GeneratePlanRequest):
     handler = PlanGenerationHandler(verbose=False)
     result = handler.generate_plan(
         session=session,
-        max_iterations=request.max_iterations,
-        use_intelligent_processing=request.use_intelligent_processing
+        max_iterations=request.max_iterations
     )
     
     return GeneratePlanResponse(

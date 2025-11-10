@@ -116,7 +116,7 @@ class UnifiedLLM:
     def __init__(
         self,
         provider: str = "openai",
-        temperature: float = None,  # None = use model default
+        temperature: Optional[float] = None,
         openai_model: str = "gpt-4o-mini",
         gemini_model: str = "gemini-2.5-pro",
         nvidia_model: str = "qwen3-next-80b-a3b-instruct",
@@ -395,7 +395,7 @@ USE_LLM_CONVERTER = os.getenv("USE_LLM_CONVERTER", "false").lower() in ("true", 
 
 # Single export used across the app (main model for analysis)
 # Don't specify temperature - use model defaults
-model = UnifiedLLM(provider=LLM_PROVIDER, temperature=None,max_output_tokens=32768)
+model = UnifiedLLM(provider=LLM_PROVIDER, max_output_tokens=16384)
 
 # Separate converter model for MD → JSON conversion (mini model)
 # Note: temperature=None to use model defaults - avoids compatibility issues
@@ -405,7 +405,7 @@ converter_model = UnifiedLLM(
     openai_model=CONVERTER_MODEL if CONVERTER_PROVIDER == "openai" else "gpt-4o-mini",
     gemini_model=CONVERTER_MODEL if CONVERTER_PROVIDER in ("gemini", "google") else "gemini-1.5-flash",
     nvidia_model=CONVERTER_MODEL if CONVERTER_PROVIDER == "nvidia" else "qwen3-next-80b-a3b-instruct",
-    max_output_tokens=16000  # Large output for JSON
+    # max_output_tokens=16000  # Large output for JSON
 )
 
 logger.info(f"LLM Configuration: Primary={model.active_provider}, Converter={converter_model.active_provider}")
