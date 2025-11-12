@@ -21,8 +21,7 @@ import shutil
 from datetime import datetime
 
 # LangChain Docling imports
-from langchain_docling import DoclingLoader
-from langchain_docling.loader import ExportType
+from langchain_docling.loader import ExportType, DoclingLoader
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +136,27 @@ class DoclingParser:
                     if cached_md_path.exists():
                         shutil.copy2(cached_md_path, new_md_path)
                         logger.info(f"      Copied to: {new_md_path.name}")
+                        
+                        # Create ParsedDocument from cached content for consolidated context
+                        with open(cached_md_path, 'r', encoding='utf-8') as f:
+                            cached_content = f.read()
+                        
+                        cached_doc = ParsedDocument(
+                            file_path=str(Path(pdf_path).absolute()),
+                            file_name=pdf_name,
+                            markdown_content=cached_content,
+                            output_md_path=str(new_md_path),
+                            metadata={
+                                "source": pdf_name,
+                                "file_type": "pdf",
+                                "parser": "langchain_docling",
+                                "cached": True
+                            },
+                            processing_time=0.0,  # Cached, no processing time
+                            num_pages=0  # Not tracking page count for cached docs
+                        )
+                        parsed_documents.append(cached_doc)
+                        
                     else:
                         logger.warning(f"      Cached MD file not found: {cached_md_path}")
                     
@@ -195,9 +215,10 @@ class DoclingParser:
         
         logger.info(f"\n{'='*80}")
         logger.info(f"✅ Parsing Complete!")
-        logger.info(f"   • Parsed: {len(parsed_documents)} documents")
-        logger.info(f"   • Cached: {cache_hits} documents")
-        logger.info(f"   • Total: {len(parsed_documents) + cache_hits}/{len(pdf_paths)}")
+        logger.info(f"   • Total Documents: {len(parsed_documents)}")
+        logger.info(f"   • Cache Hits: {cache_hits}")
+        logger.info(f"   • Cache Misses: {cache_misses}")
+        logger.info(f"   • Success Rate: {len(parsed_documents)}/{len(pdf_paths)}")
         logger.info(f"{'='*80}\n")
         
         return {

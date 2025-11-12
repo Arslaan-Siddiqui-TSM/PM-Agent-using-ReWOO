@@ -120,7 +120,7 @@ class UnifiedLLM:
         openai_model: str = "gpt-4o-mini",
         gemini_model: str = "gemini-2.5-pro",
         nvidia_model: str = "qwen3-next-80b-a3b-instruct",
-        max_output_tokens: int = 8192,
+        max_output_tokens: int = 16284,
         request_timeout: int = 120,
     ) -> None:
         self.provider = provider.lower().strip()
@@ -386,26 +386,6 @@ class UnifiedLLM:
 # Read provider preference from environment, default to OpenAI
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
 
-# Converter-specific configuration
-# DEPRECATED: LLM converter is no longer used. Docling now outputs JSON directly.
-# These settings are kept for backward compatibility but have no effect.
-CONVERTER_PROVIDER = os.getenv("CONVERTER_PROVIDER", LLM_PROVIDER).lower()
-CONVERTER_MODEL = os.getenv("CONVERTER_MODEL", "gpt-4o-mini")  # Default to mini model
-USE_LLM_CONVERTER = os.getenv("USE_LLM_CONVERTER", "false").lower() in ("true", "1", "yes")
+model = UnifiedLLM(provider=LLM_PROVIDER, max_output_tokens=32000)
 
-# Single export used across the app (main model for analysis)
-# Don't specify temperature - use model defaults
-model = UnifiedLLM(provider=LLM_PROVIDER, max_output_tokens=16384)
-
-# Separate converter model for MD → JSON conversion (mini model)
-# Note: temperature=None to use model defaults - avoids compatibility issues
-converter_model = UnifiedLLM(
-    provider=CONVERTER_PROVIDER,
-    temperature=None,  # Use model default
-    openai_model=CONVERTER_MODEL if CONVERTER_PROVIDER == "openai" else "gpt-4o-mini",
-    gemini_model=CONVERTER_MODEL if CONVERTER_PROVIDER in ("gemini", "google") else "gemini-1.5-flash",
-    nvidia_model=CONVERTER_MODEL if CONVERTER_PROVIDER == "nvidia" else "qwen3-next-80b-a3b-instruct",
-    # max_output_tokens=16000  # Large output for JSON
-)
-
-logger.info(f"LLM Configuration: Primary={model.active_provider}, Converter={converter_model.active_provider}")
+logger.info(f"LLM Configuration: Model={model.active_provider}")

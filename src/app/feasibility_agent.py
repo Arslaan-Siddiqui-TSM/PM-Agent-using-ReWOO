@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 from src.config.llm_config import model
 from rich.console import Console
-from rich.panel import Panel
 
 
 console = Console()
@@ -58,14 +57,14 @@ def _build_stage2_prompt(thinking_summary: str, user_payload: dict, session_id: 
     Build Stage 2 prompt for feasibility report generation.
     
     Combines:
-    - Stage 2 template (feasibility_report_from_thinking.txt)
+    - Stage 2 template (feasibility_report.txt)
     - Thinking summary from Stage 1
     - Original development_context and documents
     """
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Building Stage 2 prompt")
     
     # Load Stage 2 template
-    prompt_path = Path(__file__).parent.parent.parent / "prompts" / "feasibility_report_from_thinking.txt"
+    prompt_path = Path(__file__).parent.parent.parent / "prompts" / "feasibility_report.txt"
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading Stage 2 template from: {prompt_path}")
     
     try:
@@ -80,7 +79,7 @@ def _build_stage2_prompt(thinking_summary: str, user_payload: dict, session_id: 
     stage2_payload = {
         "thinking_summary": thinking_summary,
         "development_context": user_payload.get("development_context", {}),
-        "documents": user_payload.get("documents", user_payload.get("documents_summary", {})),
+        "unified_context": user_payload.get("unified_context", {}),
         "session_id": session_id
     }
     
@@ -95,48 +94,52 @@ def _build_stage2_prompt(thinking_summary: str, user_payload: dict, session_id: 
     return full_prompt_stage2
 
 
-def generate_feasibility_questions(document_text: str, development_context: dict | None = None, session_id: str = "unknown", use_v3: bool = True, md_file_paths: list[str] | None = None) -> dict:
+def generate_feasibility_questions(context_file_path: str, development_context: dict | None = None, session_id: str = "unknown") -> dict:
     """Generate feasibility questions for the Tech Lead review.
 
     Args:
-        document_text (str): The markdown text content from parsed documents.
+        context_file_path (str): Path to the unified context file containing feasibility report and document content.
         development_context (dict, optional): Development process information from user.
         session_id (str, optional): Session ID for the assessment.
-        use_v3 (bool, optional): Use v3/v4 prompt (default: True).
 
     Returns:
         dict: Dictionary with keys 'thinking_summary' and 'feasibility_report' containing markdown text.
     """    
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Starting feasibility question generation")
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Using prompt version: {'v4' if use_v3 else 'v2'}")
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Input document text length: {len(document_text)} characters")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Context file path: {context_file_path}")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Development context provided: {development_context is not None}")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Session ID: {session_id}")
+    
+    # Read the unified context file
+    try:
+        with open(context_file_path, 'r', encoding='utf-8') as f:
+            unified_context = f.read()
+        console.print(f"[bold green]DEBUG:[/bold green] Unified context file loaded, length: {len(unified_context)} characters")
+    except Exception as e:
+        console.print(f"[bold red]ERROR:[/bold red] Failed to read unified context file: {e}")
+        return {
+            "thinking_summary": f"Error reading context file: {e}",
+            "feasibility_report": f"Error reading context file: {e}"
+        }
     
     # Get project root directory (two levels up from this file)
     project_root = Path(__file__).parent.parent.parent
     
-    # Select prompt version
-    if use_v3:
-        prompt_path = project_root / "prompts" / "feasibility_promptv4.txt"
-    else:
-        prompt_path = project_root / "prompts" / "feasibility_promptv2.txt"
+    # Load Stage 1 prompt (Thinking Summary)
+    prompt_path = project_root / "prompts" / "thinking_summary.txt"
     
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading prompt from: {prompt_path}")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading Stage 1 prompt from: {prompt_path}")
     
     with open(prompt_path, "r", encoding="utf-8") as f:
         system_prompt = f.read()
     
     console.print(f"[bold yellow]DEBUG:[/bold yellow] System prompt loaded, length: {len(system_prompt)} characters")
     
-    # Prepare text input from MD files
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Using MD file text input")
-    
-    # Truncate document text if too long (keep reasonable limit for token budget)
-    max_doc_length = 150000 if use_v3 else 25000  # V3/V4 allows larger context
-    if len(document_text) > max_doc_length:
-        console.print(f"[bold yellow]DEBUG:[/bold yellow] Truncating document text to {max_doc_length} characters")
-        document_text = document_text[:max_doc_length]
+    # Truncate unified context if too long (keep reasonable limit for token budget)
+    max_context_length = 150000  # Allows larger context for modern LLMs
+    if len(unified_context) > max_context_length:
+        console.print(f"[bold yellow]DEBUG:[/bold yellow] Truncating unified context to {max_context_length} characters")
+        unified_context = unified_context[:max_context_length]
     
     # If development_context is None, provide an empty dict with "unknown" placeholder
     if development_context is None:
@@ -150,16 +153,16 @@ def generate_feasibility_questions(document_text: str, development_context: dict
             "constraints": "unknown"
         }
     
-    # Build payload with MD text content
+    # Build payload with unified context
     user_payload = {
         "development_context": development_context,
-        "documents_summary": {
+        "unified_context": {
             "session_id": session_id,
-            "content": document_text,
-            "source": "markdown files"
+            "content": unified_context,
+            "source": context_file_path
         }
     }
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Using MD text payload format")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Built user payload with unified context")
     
     # Build the full prompt with system instructions + JSON payload
     user_message = json.dumps(user_payload, ensure_ascii=False, indent=2)

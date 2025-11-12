@@ -292,7 +292,7 @@ class UploadHandler:
             # ========================================
             session.parsed_documents = parsed_documents
             session.parsed_documents_dir = parsing_result["markdown_directory"]
-            session.context_file_path = parsing_result["context_file_path"]
+            session.context_file_path = parsing_result.get("context_file_path")  # May be None if all cached
             session.parsing_log_path = parsing_result["parsing_log_path"]
             
             # Update session status to completed
@@ -309,7 +309,8 @@ class UploadHandler:
             print(f"{'='*80}")
             print(f"   Session ID: {session.session_id}")
             print(f"   Markdown Files: {len(parsed_documents)}")
-            print(f"   Context File: {Path(session.context_file_path).name}")
+            if session.context_file_path:
+                print(f"   Context File: {Path(session.context_file_path).name}")
             print(f"   Output: {session.parsed_documents_dir}")
             print(f"   Status: Ready for feasibility questions and plan generation")
             print(f"{'='*80}\n")

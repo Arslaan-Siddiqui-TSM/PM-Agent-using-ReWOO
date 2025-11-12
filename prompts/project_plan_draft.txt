@@ -440,6 +440,9 @@ What must go right for project success
 
 ## INPUT DATA
 
+### Iteration Context:
+{iteration_context}
+
 ### Initial Documents:
 {initial_documents}
 
@@ -448,6 +451,9 @@ What must go right for project success
 
 ### PM Manual Inputs:
 {pm_inputs}
+
+### Revision Guidance:
+{revision_guidance}
 
 ---
 
