@@ -95,20 +95,18 @@ def _build_stage2_prompt(thinking_summary: str, user_payload: dict, session_id: 
     return full_prompt_stage2
 
 
-def generate_feasibility_questions(document_text: str, development_context: dict | None = None, session_id: str = "unknown", use_v3: bool = True, md_file_paths: list[str] | None = None) -> dict:
+def generate_feasibility_questions(document_text: str, development_context: dict | None = None, session_id: str = "unknown", md_file_paths: list[str] | None = None) -> dict:
     """Generate feasibility questions for the Tech Lead review.
 
     Args:
         document_text (str): The markdown text content from parsed documents.
         development_context (dict, optional): Development process information from user.
         session_id (str, optional): Session ID for the assessment.
-        use_v3 (bool, optional): Use v3/v4 prompt (default: True).
 
     Returns:
         dict: Dictionary with keys 'thinking_summary' and 'feasibility_report' containing markdown text.
     """    
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Starting feasibility question generation")
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Using prompt version: {'v4' if use_v3 else 'v2'}")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Input document text length: {len(document_text)} characters")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Development context provided: {development_context is not None}")
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Session ID: {session_id}")
@@ -116,12 +114,8 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     # Get project root directory (two levels up from this file)
     project_root = Path(__file__).parent.parent.parent
     
-    # Select prompt version (Stage 1: Thinking Summary)
-    if use_v3:
-        prompt_path = project_root / "prompts" / "thinking_summary.txt"
-    else:
-        # Legacy v2 - fallback to v2 prompt if needed
-        prompt_path = project_root / "prompts" / "feasibility_promptv2.txt"
+    # Load Stage 1 prompt (Thinking Summary)
+    prompt_path = project_root / "prompts" / "thinking_summary.txt"
     
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading Stage 1 prompt from: {prompt_path}")
     
@@ -134,7 +128,7 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Using MD file text input")
     
     # Truncate document text if too long (keep reasonable limit for token budget)
-    max_doc_length = 150000 if use_v3 else 25000  # V3/V4 allows larger context
+    max_doc_length = 150000  # Allows larger context for modern LLMs
     if len(document_text) > max_doc_length:
         console.print(f"[bold yellow]DEBUG:[/bold yellow] Truncating document text to {max_doc_length} characters")
         document_text = document_text[:max_doc_length]

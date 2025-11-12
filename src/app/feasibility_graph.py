@@ -21,7 +21,6 @@ def _generate_assessment(state: FeasibilityState) -> dict:
         document_text="",  # Not used in v3 mode with md_file_paths
         development_context=state.development_context,
         session_id=state.session_id,
-        use_v3=True,
         md_file_paths=state.md_file_paths
     )
     
