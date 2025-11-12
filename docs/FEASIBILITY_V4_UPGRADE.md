@@ -1,8 +1,16 @@
 # Feasibility Prompt V4 Upgrade
 
+> **⚠️ LATEST UPDATE:** The system has been upgraded to a two-stage architecture.
+> - **Stage 1:** `prompts/thinking_summary.txt` - Generates detailed analytical thinking summary
+> - **Stage 2:** `prompts/feasibility_report.txt` - Transforms analysis into stakeholder-ready report
+> 
+> See the updated "Current System" section below.
+
 ## Overview
 
 The feasibility prompt has been upgraded from v3 to v4 with significant improvements in prompt engineering quality and robustness.
+
+**Latest (Two-Stage System):** The v4 prompt has been further refined into a two-stage process for better separation of concerns and improved output quality.
 
 ## Changes Made
 
@@ -52,18 +60,42 @@ The feasibility prompt has been upgraded from v3 to v4 with significant improvem
 
 **Note:** Function and variable names remain as `get_v3_config()` and `V3_CONFIG` for backward compatibility.
 
+## Current System (Two-Stage Architecture)
+
+The latest implementation uses a two-stage process:
+
+**Stage 1: Thinking Summary (`thinking_summary.txt`)**
+- **Purpose:** Generate detailed analytical reasoning with all calculations, assumptions, and decision logic
+- **Input:** `development_context` JSON (25 fields) + `requirement_context.md` (consolidated documents)
+- **Output:** `thinking_summary.md` with 10 sections of deep analysis (2500-4000 words)
+- **Sections:** Input normalization, requirements inventory, calculations, risk assessment, scoring logic, verdict, etc.
+
+**Stage 2: Feasibility Report (`feasibility_report.txt`)**
+- **Purpose:** Transform analytical thinking into stakeholder-ready comprehensive report
+- **Input:** `thinking_summary.md` + `development_context` JSON + `requirement_context.md`
+- **Output:** `feasibility_report.md` - polished report for executives and decision-makers (5000-8000 words)
+- **Focus:** Business-friendly language, actionable recommendations, evidence-based analysis
+
+**Key Improvements:**
+- Separation of analytical reasoning from stakeholder communication
+- Better citation system with dynamic document references
+- Two-stage verification reduces hallucination
+- Cleaner output structure
+
 ## Version Comparison
 
-| Feature | V3 | V4 |
-|---------|----|----|
-| Prompt File | feasibility_promptv3.txt | feasibility_promptv4.txt |
-| Total Lines | 1,288 | 1,620 |
-| Input Examples | None | Complete JSON example |
-| Quality Examples | None | 3 major examples (effort, risk, citation) |
-| Warning Labels | Minimal | Throughout (CRITICAL, IMPORTANT, DO NOT) |
-| Edge Case Handling | Implicit | Explicit section |
-| Verification | Quality indicators | Actionable checklist |
-| Scoring Examples | Dense formulas | Formulas + examples + scales |
+| Feature | V3 | V4 (Original) | V4 (Two-Stage - Current) |
+|---------|----|----|--------------------------|
+| Prompt File | feasibility_promptv3.txt | feasibility_promptv4.txt | thinking_summary.txt + feasibility_report.txt |
+| Architecture | Single-stage | Single-stage | Two-stage |
+| Total Lines | 1,288 | 1,620 | 1,671 + 686 |
+| Input Examples | None | Complete JSON example | Complete JSON + MD structure |
+| Quality Examples | None | 3 major examples | Extensive examples in both stages |
+| Warning Labels | Minimal | Throughout | Throughout both stages |
+| Edge Case Handling | Implicit | Explicit section | Explicit in both stages |
+| Verification | Quality indicators | Actionable checklist | Two-stage verification |
+| Scoring Examples | Dense formulas | Formulas + examples + scales | Extracted from Stage 1 in Stage 2 |
+| Citation Format | Basic | Improved | Dynamic document names |
 
 ## Benefits
 
@@ -112,19 +144,35 @@ With v4, you should see:
 
 ## Rollback
 
-If needed, you can rollback by changing one line in `src/app/feasibility_agent.py`:
+If needed, you can rollback by changing two lines in `src/app/feasibility_agent.py`:
 
+**Stage 1 Prompt (Line 121):**
 ```python
-# Change line 85 from:
+# Current (Two-Stage):
+prompt_path = project_root / "prompts" / "thinking_summary.txt"
+
+# Rollback to V4 Single-Stage:
 prompt_path = project_root / "prompts" / "feasibility_promptv4.txt"
 
-# Back to:
+# Or rollback to V3:
 prompt_path = project_root / "prompts" / "feasibility_promptv3.txt"
 ```
 
+**Stage 2 Prompt (Line 68):**
+```python
+# Current (Two-Stage):
+prompt_path = Path(__file__).parent.parent.parent / "prompts" / "feasibility_report.txt"
+
+# Rollback to V4 Single-Stage (if using old system):
+prompt_path = Path(__file__).parent.parent.parent / "prompts" / "feasibility_report_from_thinking.txt"
+```
+
+**Note:** The two-stage system requires both prompts to be updated together. Rolling back only one will cause issues.
+
 ## Version History
 
-- **V4 (Current)**: Enhanced prompt engineering with examples, verification, and edge case handling
+- **V4 Two-Stage (Current)**: Separated into `thinking_summary.txt` and `feasibility_report.txt` for better output quality and structure
+- **V4 Single-Stage**: Enhanced prompt engineering with examples, verification, and edge case handling
 - **V3**: Comprehensive reports with structured JSON input
 - **V2**: Basic feasibility analysis with text input
 

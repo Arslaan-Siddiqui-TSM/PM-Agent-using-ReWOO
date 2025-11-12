@@ -58,14 +58,14 @@ def _build_stage2_prompt(thinking_summary: str, user_payload: dict, session_id: 
     Build Stage 2 prompt for feasibility report generation.
     
     Combines:
-    - Stage 2 template (feasibility_report_from_thinking.txt)
+    - Stage 2 template (feasibility_report.txt)
     - Thinking summary from Stage 1
     - Original development_context and documents
     """
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Building Stage 2 prompt")
     
     # Load Stage 2 template
-    prompt_path = Path(__file__).parent.parent.parent / "prompts" / "feasibility_report_from_thinking.txt"
+    prompt_path = Path(__file__).parent.parent.parent / "prompts" / "feasibility_report.txt"
     console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading Stage 2 template from: {prompt_path}")
     
     try:
@@ -116,13 +116,14 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     # Get project root directory (two levels up from this file)
     project_root = Path(__file__).parent.parent.parent
     
-    # Select prompt version
+    # Select prompt version (Stage 1: Thinking Summary)
     if use_v3:
-        prompt_path = project_root / "prompts" / "feasibility_promptv4.txt"
+        prompt_path = project_root / "prompts" / "thinking_summary.txt"
     else:
+        # Legacy v2 - fallback to v2 prompt if needed
         prompt_path = project_root / "prompts" / "feasibility_promptv2.txt"
     
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading prompt from: {prompt_path}")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Loading Stage 1 prompt from: {prompt_path}")
     
     with open(prompt_path, "r", encoding="utf-8") as f:
         system_prompt = f.read()
