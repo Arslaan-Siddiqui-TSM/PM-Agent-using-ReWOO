@@ -201,6 +201,9 @@ Generate the FINAL project plan in Markdown format with the same 15-section stru
 
 ## INPUT DATA
 
+### Iteration Context:
+{iteration_context}
+
 ### Draft Project Plan:
 {draft_project_plan}
 

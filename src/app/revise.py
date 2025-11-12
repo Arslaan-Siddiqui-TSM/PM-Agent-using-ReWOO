@@ -9,6 +9,60 @@ from src.states.reflection_state import ReflectionIteration, ReflectionState
 from src.utils.helper import get_global_logger, load_feasibility_answers, load_prompt_template
 
 
+def _build_revision_context(state: ReflectionState, iteration_number: int) -> str:
+    """Build comprehensive iteration context for revision decision prompt."""
+    
+    if iteration_number == 0:
+        return "This is the initial draft. No prior revision history exists."
+    
+    context_lines = [
+        f"## REVISION DECISION CONTEXT:",
+        f"- Current iteration: {iteration_number} of {state.max_iterations}",
+    ]
+    
+    # Quality progression
+    if state.quality_scores:
+        scores_str = ", ".join([f"v{i+1}: {score:.1f}" for i, score in enumerate(state.quality_scores)])
+        context_lines.append(f"- Quality trend: {scores_str}")
+        
+        # Calculate improvement
+        if len(state.quality_scores) >= 2:
+            improvement = state.quality_scores[-1] - state.quality_scores[-2]
+            if improvement > 0:
+                context_lines.append(f"- Last iteration improved by: +{improvement:.1f} points")
+            elif improvement < 0:
+                context_lines.append(f"- Last iteration regressed by: {improvement:.1f} points")
+            else:
+                context_lines.append(f"- Quality plateaued (no improvement)")
+    
+    # Past decisions
+    if state.iterations:
+        accepted_count = sum(1 for it in state.iterations if it.accepted)
+        rejected_count = len(state.iterations) - accepted_count
+        context_lines.append(f"- Past decisions: {accepted_count} accepted, {rejected_count} revised")
+    
+    # Iteration summaries
+    if state.iteration_summaries:
+        context_lines.append("\n## ITERATION HISTORY:")
+        for summary in state.iteration_summaries:
+            context_lines.append(f"- {summary}")
+    
+    # Outstanding focus areas
+    if state.improvement_areas:
+        recent_areas = state.improvement_areas[-3:]  # Last 3
+        context_lines.append("\n## CURRENT FOCUS AREAS:")
+        for area in recent_areas:
+            context_lines.append(f"- {area}")
+    
+    # Addressed issues
+    if state.addressed_issues:
+        context_lines.append("\n## PREVIOUSLY RESOLVED:")
+        for issue in state.addressed_issues[-5:]:
+            context_lines.append(f"✓ {issue}")
+    
+    return "\n".join(context_lines)
+
+
 def _safe_parse_json(payload: str) -> Dict[str, str]:
     """Bulletproof JSON parsing with extensive fallback handling."""
     
@@ -94,6 +148,10 @@ def apply_revision(state: ReflectionState) -> Dict[str, object]:
         else None
     ) or "Feasibility notes unavailable."
     print(f"✓ Feasibility context loaded ({len(feasibility_context)} chars)", flush=True)
+    
+    # Build iteration context for revision decision
+    iteration_number = len(state.iterations)
+    iteration_context = _build_revision_context(state, iteration_number)
 
     print("→ Formatting prompt...", flush=True)
     
@@ -105,6 +163,7 @@ def apply_revision(state: ReflectionState) -> Dict[str, object]:
         documents_safe = (state.document_context or "Document context unavailable.").replace("{", "{{").replace("}", "}}")
         draft_safe = state.current_draft.replace("{", "{{").replace("}", "}}")
         critique_safe = (state.current_critique or "No critique generated.").replace("{", "{{").replace("}", "}}")
+        iteration_context_safe = iteration_context.replace("{", "{{").replace("}", "}}")
         print("  ✓ Variables escaped", flush=True)
         
         print("  → Calling prompt_template.format()...", flush=True)
@@ -114,6 +173,7 @@ def apply_revision(state: ReflectionState) -> Dict[str, object]:
             initial_documents=documents_safe,
             draft_project_plan=draft_safe,
             reflection_critique=critique_safe,
+            iteration_context=iteration_context_safe,
         )
         print(f"✓ Prompt formatted ({len(formatted_prompt)} chars)", flush=True)
         
@@ -189,10 +249,6 @@ def apply_revision(state: ReflectionState) -> Dict[str, object]:
     iterations = list(state.iterations)
     latest_iteration = iterations[-1].model_copy()
     latest_iteration.accepted = decision == "accept"
-    if rationale:
-        latest_iteration.reasoning = (
-            f"{latest_iteration.reasoning or ''}\nDecision rationale: {rationale}"
-        ).strip()
     iterations[-1] = latest_iteration
 
     logger = get_global_logger()
@@ -203,6 +259,7 @@ def apply_revision(state: ReflectionState) -> Dict[str, object]:
             response=raw_response,
             additional_context={
                 "Decision": decision,
+                "Rationale": rationale,
                 "Has Required Actions": "yes" if required_actions else "no",
                 "Iteration": len(iterations),
             },
@@ -210,33 +267,36 @@ def apply_revision(state: ReflectionState) -> Dict[str, object]:
 
     if decision == "accept":
         # Finalize with the approved plan.
+        # Mark current improvement areas as addressed
+        addressed_issues = list(state.addressed_issues)
+        if state.improvement_areas:
+            addressed_issues.extend(state.improvement_areas[-3:])  # Last 3 focus areas now resolved
+        
         return {
             "iterations": iterations,
-            "decision_rationale": rationale,
             "final_plan": state.current_draft,
-            "revision_instructions": None,
             "decision": "accept",
-            "required_actions": "",
+            "addressed_issues": addressed_issues,
         }
 
     if len(iterations) >= state.max_iterations:
         # Hit iteration cap; accept best effort to avoid infinite loop.
         iterations[-1].accepted = True
+        
+        # Mark as addressed even if forced
+        addressed_issues = list(state.addressed_issues)
+        if state.improvement_areas:
+            addressed_issues.extend(state.improvement_areas[-3:])
+        
         return {
             "iterations": iterations,
-            "decision_rationale": "Iteration cap reached. Returning best available draft.",
             "final_plan": state.current_draft,
-            "revision_instructions": None,
             "decision": "forced-accept",
-            "required_actions": required_actions,
+            "addressed_issues": addressed_issues,
         }
 
     # Request another cycle: instruct the draft node what to fix.
     return {
         "iterations": iterations,
-        "current_critique": None,
-        "decision_rationale": rationale,
-        "revision_instructions": required_actions or None,
         "decision": "revise",
-        "required_actions": required_actions,
     }

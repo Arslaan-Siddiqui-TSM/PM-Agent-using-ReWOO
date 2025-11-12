@@ -13,9 +13,6 @@ class ReflectionIteration(BaseModel):
     critique: Optional[str] = Field(
         default=None, description="Critique or feedback generated for the draft"
     )
-    reasoning: Optional[str] = Field(
-        default=None, description="Chain-of-thought style notes or rationale"
-    )
     accepted: bool = Field(
         default=False,
         description="Whether this iteration's draft was accepted as final output",
@@ -29,6 +26,9 @@ class ReflectionIteration(BaseModel):
 class ReflectionState(BaseModel):
     """State container for the reflection-style planning agent."""
 
+    # ═══════════════════════════════════════════════════════════
+    # CORE INPUT FIELDS
+    # ═══════════════════════════════════════════════════════════
     task: Optional[str] = Field(
         default=None, description="Original user task or problem statement"
     )
@@ -38,6 +38,10 @@ class ReflectionState(BaseModel):
     feasibility_file_path: Optional[str] = Field(
         default=None, description="Path to feasibility assessment notes"
     )
+    
+    # ═══════════════════════════════════════════════════════════
+    # ITERATION CONTROL
+    # ═══════════════════════════════════════════════════════════
     max_iterations: int = Field(
         default=3,
         description="Maximum number of draft→reflect→revise cycles before stopping",
@@ -46,23 +50,52 @@ class ReflectionState(BaseModel):
         default_factory=list,
         description="History of generated drafts and critiques",
     )
-    current_draft: Optional[str] = Field(
-        default=None, description="Draft under consideration in the current cycle"
+    
+    # ═══════════════════════════════════════════════════════════
+    # ENHANCED TRACKING (for iteration awareness)
+    # ═══════════════════════════════════════════════════════════
+    quality_scores: List[float] = Field(
+        default_factory=list,
+        description="Quality scores (0-10) for each iteration to track improvement trajectory",
     )
-    current_critique: Optional[str] = Field(
-        default=None, description="Most recent critique generated for the draft"
+    improvement_areas: List[str] = Field(
+        default_factory=list,
+        description="Focus areas identified for each iteration to avoid redundant critiques",
     )
-    revision_instructions: Optional[str] = Field(
-        default=None,
-        description="Actionable guidance for the next draft when revisions are needed",
+    iteration_summaries: List[str] = Field(
+        default_factory=list,
+        description="High-level summaries of what was addressed in each iteration",
     )
-    decision_rationale: Optional[str] = Field(
-        default=None,
-        description="Why the last revise step accepted or rejected the current draft",
+    addressed_issues: List[str] = Field(
+        default_factory=list,
+        description="Issues that have been resolved in previous iterations",
     )
+    
+    # ═══════════════════════════════════════════════════════════
+    # OUTPUT
+    # ═══════════════════════════════════════════════════════════
     final_plan: Optional[str] = Field(
         default=None, description="Accepted project plan Markdown"
     )
 
     def __getitem__(self, item: str):
+        """Allow dict-style access for LangGraph compatibility"""
         return getattr(self, item)
+    
+    # ═══════════════════════════════════════════════════════════
+    # CONVENIENCE PROPERTIES (derived from iterations)
+    # ═══════════════════════════════════════════════════════════
+    @property
+    def current_draft(self) -> Optional[str]:
+        """Get the most recent draft from iteration history"""
+        return self.iterations[-1].draft if self.iterations else None
+    
+    @property
+    def current_critique(self) -> Optional[str]:
+        """Get the most recent critique from iteration history"""
+        return self.iterations[-1].critique if self.iterations else None
+    
+    @property
+    def iteration_count(self) -> int:
+        """Current iteration number (0-indexed)"""
+        return len(self.iterations)
