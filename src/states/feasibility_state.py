@@ -17,6 +17,9 @@ class FeasibilityState(BaseModel):
     md_file_paths: Optional[List[str]] = None
     development_context: Optional[Dict[str, str]] = None
     
+    # Intermediate
+    unified_context_path: str = ""
+    
     # Outputs
     thinking_summary: str = ""
     feasibility_report: str = ""
