@@ -94,19 +94,20 @@ def main():
     print()
     print("-" * 80)
     print("Generating feasibility report...")
-    print("  Prompt: feasibility_promptv4.txt (latest)")
+    print("  Stage 1 Prompt: thinking_summary.txt")
+    print("  Stage 2 Prompt: feasibility_report.txt")
     print("  Input: Markdown text content")
     print("  Development Context: Frontend default values")
     print("-" * 80)
     print()
     
     try:
-        # Generate feasibility report with v4 prompt + markdown input
+        # Generate feasibility report with two-stage prompts + markdown input
         result = generate_feasibility_questions(
             document_text=md_content,
             development_context=FRONTEND_TEST_DATA,
             session_id=session_id,
-            use_v3=True,  # Use v4 prompt (latest)
+            use_v3=True,  # Use latest two-stage prompt system
             md_file_paths=None  # Force markdown fallback instead of JSON
         )
         
@@ -142,7 +143,7 @@ def main():
         print(f"    output/session_487da904/reports/feasibility_report_487da904_20251107_184101.md")
         print()
         print("Both reports use:")
-        print("  - Latest prompt (feasibility_promptv4.txt)")
+        print("  - Two-stage prompts (thinking_summary.txt + feasibility_report.txt)")
         print("  - Same development context (frontend defaults)")
         print("  - Same source documents")
         print()
