@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 from src.config.llm_config import model
 from rich.console import Console
-from rich.panel import Panel
 
 
 console = Console()
@@ -95,11 +94,11 @@ def _build_stage2_prompt(thinking_summary: str, user_payload: dict, session_id: 
     return full_prompt_stage2
 
 
-def generate_feasibility_questions(document_text: str, development_context: dict | None = None, session_id: str = "unknown", md_file_paths: list[str] | None = None) -> dict:
+def generate_feasibility_questions(document_text: str, development_context: dict | None = None, session_id: str = "unknown") -> dict:
     """Generate feasibility questions for the Tech Lead review.
 
     Args:
-        document_text (str): The markdown text content from parsed documents.
+        document_text (str): The unified markdown context containing all parsed documents.
         development_context (dict, optional): Development process information from user.
         session_id (str, optional): Session ID for the assessment.
 
@@ -124,9 +123,6 @@ def generate_feasibility_questions(document_text: str, development_context: dict
     
     console.print(f"[bold yellow]DEBUG:[/bold yellow] System prompt loaded, length: {len(system_prompt)} characters")
     
-    # Prepare text input from MD files
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Using MD file text input")
-    
     # Truncate document text if too long (keep reasonable limit for token budget)
     max_doc_length = 150000  # Allows larger context for modern LLMs
     if len(document_text) > max_doc_length:
@@ -145,16 +141,16 @@ def generate_feasibility_questions(document_text: str, development_context: dict
             "constraints": "unknown"
         }
     
-    # Build payload with MD text content
+    # Build payload with unified document context
     user_payload = {
         "development_context": development_context,
         "documents_summary": {
             "session_id": session_id,
             "content": document_text,
-            "source": "markdown files"
+            "source": "unified markdown context"
         }
     }
-    console.print(f"[bold yellow]DEBUG:[/bold yellow] Using MD text payload format")
+    console.print(f"[bold yellow]DEBUG:[/bold yellow] Built user payload with unified document context")
     
     # Build the full prompt with system instructions + JSON payload
     user_message = json.dumps(user_payload, ensure_ascii=False, indent=2)
